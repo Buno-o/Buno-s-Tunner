@@ -35,8 +35,23 @@ jobs:
           Get-ChildItem libs
 
       - name: Compilar
-        shell: cmd
-        run: build.bat
+        shell: pwsh
+        run: |
+          $out = cmd /c "build.bat 2>&1"
+          $code = $LASTEXITCODE
+          $out | Out-File build.log -Encoding utf8
+          $out | ForEach-Object { Write-Host $_ }
+          $n = 0
+          foreach ($l in $out) { if ($l -match 'error|ERRO|Copie|Nao encontrei') { $n++; if ($n -le 40) { Write-Host "::error::$l" } } }
+          exit $code
+
+      - name: Log de compilacao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          if-no-files-found: ignore
 
       - name: Ler versao
         id: ver
