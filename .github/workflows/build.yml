@@ -36,7 +36,7 @@ jobs:
           $pk = Join-Path $env:USERPROFILE '.nuget/packages/librehardwaremonitorlib/0.9.6'
           $all = Get-ChildItem $pk -Recurse -Filter LibreHardwareMonitorLib.dll
           Write-Host "::notice::FOUND=$(($all | ForEach-Object { $_.FullName.Substring($pk.Length) }) -join ' | ')"
-          $lib = $all | Where-Object { $_.FullName -match 'win-x64' } | Select-Object -First 1
+          $lib = $all | Where-Object { $_.FullName -match 'win-x64.lib.net472' } | Select-Object -First 1
           if (-not $lib) { $lib = $all | Select-Object -First 1 }
           if ($lib) { Copy-Item $lib.FullName libs/ -Force }
           Get-ChildItem lhm/out -Filter *.dll | Where-Object { $_.Name -ne 'lhm.dll' } | ForEach-Object { Copy-Item $_.FullName libs/ -Force }
