@@ -1,5 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
+set PAUSECMD=pause
+if /i "%CI%"=="true" set PAUSECMD=rem
 cd /d "%~dp0"
 set PLAT=x64
 set CSC=%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe
@@ -9,11 +11,11 @@ if not exist "%CSC%" (
 )
 if not exist "%CSC%" (
   echo Nao encontrei o compilador do .NET Framework 4.x. Instale o .NET Framework 4.8 e tente de novo.
-  pause & exit /b 1
+  %PAUSECMD% & exit /b 1
 )
 if not exist libs\LibreHardwareMonitorLib.dll (
   echo Copie TODAS as .dll do LibreHardwareMonitor para a pasta libs\ e rode de novo. Veja LEIA-ME.txt
-  pause & exit /b 1
+  %PAUSECMD% & exit /b 1
 )
 set ICON=
 if exist BunosTunner.ico set ICON=/win32icon:BunosTunner.ico
@@ -24,8 +26,8 @@ echo Compilando para %PLAT% ...
 if errorlevel 1 (
   echo.
   echo ERRO de compilacao - copie as mensagens acima e me mande.
-  pause & exit /b 1
+  %PAUSECMD% & exit /b 1
 )
 echo.
 echo Pronto: BunosTunner.exe (portable, arquivo unico). Execute como Administrador.
-pause
+%PAUSECMD%

@@ -114,6 +114,249 @@ namespace BunosTunner
         }
     }
 
+    // ------------------------------------------------------------------
+    //  Idiomas: padrao = idioma do Windows (portugues ou ingles); o texto original do programa e em portugues
+    // ------------------------------------------------------------------
+    static class Lang
+    {
+        public static int Cur;   // 0 = portugues, 1 = ingles
+        static Dictionary<string, string> en = new Dictionary<string, string>();
+        static Dictionary<object, string> orig = new Dictionary<object, string>();
+        static readonly string[] Pairs = {
+            "Placa de video:", "Graphics card:",
+            "Tema:", "Theme:",
+            "Ventoinhas\nAutomatico, manual (% e RPM) e curva de temperatura", "Fans\nAutomatic, manual (% and RPM) and temperature curve",
+            "Overclock\nCore clock, memory clock, TDP, limite de temperatura e travar clocks", "Overclock\nCore clock, memory clock, TDP, temperature limit and clock locking",
+            "Especificacoes da GPU\nTodos os dados da placa de video", "GPU specifications\nAll graphics card data",
+            "Especificacoes da CPU\nProcessador, nucleos, cache, clocks e conjuntos de instrucoes", "CPU specifications\nProcessor, cores, cache, clocks and instruction sets",
+            "Benchmark / Estresse\nGPU, CPU, FPU, RAM e SSD com verificacao de erros e limite de temperatura", "Benchmark / Stress test\nGPU, CPU, FPU, RAM and SSD with error checking and temperature limit",
+            "Memoria RAM\nVelocidade, canais, voltagem, modulos e timings basicos (tCAS, tRCD, tRP, tRAS, tRC, tRFC, Command Rate)", "RAM\nSpeed, channels, voltage, modules and basic timings (tCAS, tRCD, tRP, tRAS, tRC, tRFC, Command Rate)",
+            "Saude do armazenamento\nVida util restante, temperatura e S.M.A.R.T. de SSDs NVMe/SATA e HDs", "Storage health\nRemaining life, temperature and S.M.A.R.T. of NVMe/SATA SSDs and HDDs",
+            "Internet\nTeste de velocidade (ping, download, upload) e informacoes da rede", "Internet\nSpeed test (ping, download, upload) and network information",
+            "Afinidade de processos\nEscolha em quais nucleos cada programa roda; presets e regras automaticas", "Process affinity\nChoose which cores each program runs on; presets and automatic rules",
+            "Desinstalador\nRemove programas por completo: pastas, registro, inicializacao, servicos e tarefas que sobram; tambem remove o que se recusa a desinstalar", "Uninstaller\nRemoves programs completely: leftover folders, registry, startup entries, services and tasks; also removes what refuses to uninstall",
+            "Otimizacoes do Windows\nLimpeza de temporarios, compressao de memoria e outros ajustes", "Windows optimizations\nTemp cleanup, memory compression and other tweaks",
+            "Sensores\nTudo em uma janela: GPU, CPU, placa-mae, memoria, discos e ventoinhas, com grafico, busca e alertas", "Sensors\nEverything in one window: GPU, CPU, motherboard, memory, disks and fans, with graph, search and alerts",
+            "Limpar arquivos temporarios", "Clean temporary files",
+            "Apaga C:\\Windows\\Temp, Prefetch e a pasta %temp% do usuario (itens em uso sao ignorados). Nenhum documento pessoal e tocado.", "Deletes C:\\Windows\\Temp, Prefetch and the user %temp% folder (files in use are skipped). No personal documents are touched.",
+            "Desativar compressao de memoria", "Disable memory compression",
+            "Executa Disable-MMAgent -mc: o Windows deixa de comprimir a RAM (usa um pouco menos de CPU, um pouco mais de RAM). Vale apos reiniciar o PC.", "Runs Disable-MMAgent -mc: Windows stops compressing RAM (slightly less CPU, slightly more RAM used). Takes effect after a reboot.",
+            "Menu de clique direito do Windows 10", "Windows 10 right-click menu",
+            "No Windows 11, traz de volta o menu de clique direito completo e classico do Windows 10 (sem o \"Mostrar mais opcoes\"). Vale ao reiniciar o Explorer ou fazer logoff.", "On Windows 11, brings back the full classic Windows 10 right-click menu (no \"Show more options\"). Takes effect after restarting Explorer or signing out.",
+            "Desativar MPO (Multiplane Overlay)", "Disable MPO (Multiplane Overlay)",
+            "Define OverlayTestMode=5 no DWM. Ajuda a resolver tremidas, telas piscando e telas pretas em alguns monitores/placas NVIDIA e AMD. Reinicie o PC para valer.", "Sets OverlayTestMode=5 in DWM. Helps with stutter, flickering and black screens on some monitors/NVIDIA and AMD cards. Reboot to apply.",
+            "Overlay DLSS (indicador na tela)", "DLSS overlay (on-screen indicator)",
+            "Mostra no canto do jogo um indicador quando o DLSS esta em uso (so placas NVIDIA RTX). Aplica na proxima vez que abrir o jogo.", "Shows an indicator in the game corner when DLSS is in use (NVIDIA RTX only). Applies next time the game starts.",
+            "Isolamento de nucleo (Integridade de memoria)", "Core isolation (Memory integrity)",
+            "Recurso de seguranca do Windows (HVCI) que isola o nucleo do sistema usando virtualizacao. Desativar pode dar mais FPS em jogos e liberar drivers antigos, mas reduz a protecao. Reinicie o PC.", "Windows security feature (HVCI) that isolates the system core using virtualization. Disabling may give more FPS in games and allow old drivers, but lowers protection. Reboot required.",
+            "Hibernacao", "Hibernation",
+            "Liga ou desliga a hibernacao (powercfg /hibernate). Desligada, apaga o hiberfil.dat (libera varios GB no disco) e tambem desativa a Inicializacao Rapida.", "Turns hibernation on or off (powercfg /hibernate). When off, deletes hiberfil.sys (frees several GB) and also disables Fast Startup.",
+            "Aceleracao do mouse (Aprimorar precisao do ponteiro)", "Mouse acceleration (Enhance pointer precision)",
+            "Desligada, o ponteiro anda sempre a mesma distancia para o mesmo movimento da mao (recomendado para jogos). Aplica na hora, sem reiniciar.", "When off, the pointer always moves the same distance for the same hand movement (recommended for games). Applies instantly, no reboot.",
+            "Mitigacoes do Windows (Spectre / Meltdown)", "Windows mitigations (Spectre / Meltdown)",
+            "Desativa as mitigacoes de execucao especulativa (FeatureSettingsOverride=3) para ganhar desempenho. REDUZ A SEGURANCA do PC; use so em maquina de jogos sem dados sensiveis. Reinicie o PC.", "Disables speculative-execution mitigations (FeatureSettingsOverride=3) for performance. LOWERS PC SECURITY; use only on a gaming machine without sensitive data. Reboot required.",
+            "Limpar", "Clean",
+            "Desativar", "Disable",
+            "Ativar", "Enable",
+            "Reativar", "Re-enable",
+            "Desfazer", "Undo",
+            "Padrao do Windows", "Windows default",
+            "Desativar MPO", "Disable MPO",
+            "Executando...", "Running...",
+            "GPU  -  render 3D (estilo FurMark)", "GPU  -  3D render (FurMark style)",
+            "Abre uma janela OpenGL com shader e pelos e mostra o FPS. Fechar a janela para o teste.", "Opens an OpenGL window with shaders and fur and shows FPS. Closing the window stops the test.",
+            "CPU  -  ray tracing 3D (estilo Cinebench)", "CPU  -  3D ray tracing (Cinebench style)",
+            "Renderiza uma cena em todos os nucleos, bloco a bloco. Pontos = Mrays/s x 100.", "Renders a scene on all cores, block by block. Points = Mrays/s x 100.",
+            "FPU  -  campo de ondas em ponto flutuante", "FPU  -  floating-point wave field",
+            "Calculo de ondas com seno/cosseno em todos os nucleos; mostra GFLOPS estimado.", "Wave calculation with sine/cosine on all cores; shows estimated GFLOPS.",
+            "RAM  -  escrita e leitura com verificacao", "RAM  -  write and read with verification",
+            "Grava e le padroes na memoria e confere cada valor; qualquer diferenca conta como erro.", "Writes and reads patterns in memory and checks every value; any difference counts as an error.",
+            "SSD  -  sequencial + 4K aleatorio", "SSD  -  sequential + random 4K",
+            "Usa um arquivo temporario no drive escolhido (apagado ao fim). Em 'Ate parar' gera desgaste.", "Uses a temporary file on the chosen drive (deleted at the end). 'Until stopped' causes wear.",
+            "Duracao:", "Duration:",
+            "Threads:", "Threads:",
+            "Usar (% da livre):", "Use (% of free):",
+            "Drive:", "Drive:",
+            "Tamanho:", "Size:",
+            "Parar se passar de", "Stop if above",
+            "Rodar sequencia (CPU, FPU, RAM, GPU)", "Run sequence (CPU, FPU, RAM, GPU)",
+            "Parar tudo", "Stop all",
+            "Clique no icone de um teste para iniciar.", "Click a test icon to start.",
+            "Resultado ao vivo", "Live result",
+            "Taxa atual", "Current rate",
+            "Teste", "Test",
+            "Dur.", "Dur.",
+            "Media", "Average",
+            "Pico", "Peak",
+            "Erros", "Errors",
+            "T.max", "Max T",
+            "Estab.", "Stab.",
+            "vs ant.", "vs prev.",
+            "Copiar", "Copy",
+            "Salvar CSV", "Save CSV",
+            "1. Escolha o programa que quer remover", "1. Choose the program to remove",
+            "2. Restos encontrados (revise e remova)", "2. Leftovers found (review and remove)",
+            "Buscar:", "Search:",
+            "Atualizar lista", "Refresh list",
+            "Escolher pasta ou .exe...", "Choose folder or .exe...",
+            "Desinstalar e limpar restos", "Uninstall and clean leftovers",
+            "Remocao forcada", "Forced removal",
+            "So procurar restos", "Only scan for leftovers",
+            "Encerrar processos", "End processes",
+            "Duplo clique desinstala.", "Double-click to uninstall.",
+            "Programa", "Program",
+            "Editora", "Publisher",
+            "Versao", "Version",
+            "Tamanho", "Size",
+            "Instalado", "Installed",
+            "Tipo", "Type",
+            "Local", "Location",
+            "Certeza", "Certainty",
+            "Marcar tudo", "Check all",
+            "Desmarcar tudo", "Uncheck all",
+            "Remover itens marcados", "Remove checked items",
+            "Pastas e arquivos vao para a Lixeira (podem ser recuperados)", "Folders and files go to the Recycle Bin (recoverable)",
+            "Salvar copia (.reg) das chaves do registro antes de apagar", "Save a copy (.reg) of registry keys before deleting",
+            "Criar ponto de restauracao do Windows antes", "Create a Windows restore point first",
+            "Dica: itens com 'Certeza: alta' sao ligados ao programa; os de certeza 'media' vem desmarcados - confira antes.", "Tip: items with 'high' certainty belong to the program; 'medium' ones come unchecked - review them first.",
+            "Pasta", "Folder",
+            "Exe", "Exe",
+            "Cancelar", "Cancel",
+            "Cancelando...", "Cancelling...",
+            "Teste de velocidade da internet", "Internet speed test",
+            "Informacoes da rede", "Network information",
+            "Iniciar teste", "Start test",
+            "Mostrar informacoes da rede", "Show network information",
+            "Ocultar", "Hide",
+            "Mede ping, download e upload de verdade (servidor da Cloudflare).", "Measures real ping, download and upload (Cloudflare server).",
+            "Por privacidade, nada e mostrado ate voce clicar. Ao clicar aparecem dados pessoais (IPs, MAC, provedor, cidade, nome do Wi-Fi).", "For privacy, nothing is shown until you click. Clicking reveals personal data (IPs, MAC, ISP, city, Wi-Fi name).",
+            "Seus discos", "Your disks",
+            "Detalhes do disco selecionado", "Selected disk details",
+            "Saude geral:", "Overall health:",
+            "Vida util restante:", "Remaining life:",
+            "Temperatura:", "Temperature:",
+            "Selecione um disco na lista acima.", "Select a disk in the list above.",
+            "Atualizar", "Refresh",
+            "Disco", "Disk",
+            "Saude", "Health",
+            "Vida", "Life",
+            "Temp.", "Temp.",
+            "Horas", "Hours",
+            "Atributo / sensor", "Attribute / sensor",
+            "Valor", "Value",
+            "Resumo da memória", "Memory summary",
+            "Timings atuais (leitura automática)", "Current timings (automatic reading)",
+            "Lendo os timings...", "Reading timings...",
+            "Ler novamente", "Read again",
+            "Diagnostico", "Diagnostics",
+            "Indicar CPU-Z...", "Set CPU-Z...",
+            "Baixar CPU-Z", "Download CPU-Z",
+            "Latencia da memoria (ns)", "Memory latency (ns)",
+            "Medir latencia", "Measure latency",
+            "Parar", "Stop",
+            "Latencia da RAM (bloco de 256 MB)", "RAM latency (256 MB block)",
+            "Afinidade (CPUs)", "Affinity (CPUs)",
+            "Prioridade", "Priority",
+            "Prioridade:", "Priority:",
+            "Processo", "Process",
+            "Memoria", "Memory",
+            "Filtrar:", "Filter:",
+            "Marcar mesmo nome", "Check same name",
+            "Desmarcar", "Uncheck",
+            "Pausar atualizacao", "Pause updating",
+            "Aplicar", "Apply",
+            "Aplicar aos marcados", "Apply to checked",
+            "Aplicar regras automaticamente", "Apply rules automatically",
+            "Regras automaticas", "Automatic rules",
+            "Presets", "Presets",
+            "Preset", "Preset",
+            "Salvar atual", "Save current",
+            "Excluir", "Delete",
+            "Nova regra", "New rule",
+            "Remover", "Remove",
+            "Especificacoes da CPU", "CPU specifications",
+            "Especificacoes da GPU selecionada", "Selected GPU specifications",
+            "Propriedade", "Property",
+            "Fechar", "Close",
+            "Todos", "All",
+            "Nenhum", "None",
+            "Inverter", "Invert",
+            "Fisicos", "Physical",
+            "Essenciais", "Essentials",
+            "1a metade", "1st half",
+            "2a metade", "2nd half",
+            "1) Ventoinhas detectadas (Ctrl/Shift = varias)", "1) Detected fans (Ctrl/Shift = several)",
+            "2) Como as selecionadas devem trabalhar?", "2) How should the selected fans work?",
+            "3) Aplicar", "3) Apply",
+            "Aplicar nas selecionadas", "Apply to selected",
+            "Tudo automatico", "All automatic",
+            "Identificar", "Identify",
+            "Voltar tudo ao automatico ao fechar", "Return everything to automatic on close",
+            "Ventoinha", "Fan",
+            "Modo", "Mode",
+            "Fabricante", "Manufacturer",
+            "Buscar (Ctrl+F):", "Search (Ctrl+F):",
+            "Janela:", "Window:",
+            "Zerar min/max", "Reset min/max",
+            "Copiar tudo", "Copy all",
+            "Exportar...", "Export...",
+            "Sensor", "Sensor",
+            "Min", "Min",
+            "Max", "Max",
+            "Origem", "Source",
+            "Redefinir tudo", "Reset all",
+            "Restaurar padrao", "Restore default",
+            "Destravar tudo", "Unlock all",
+            "Travar", "Lock",
+            "Overclock / limites", "Overclock / limits",
+            "Manual - velocidade fixa em %:", "Manual - fixed speed in %:",
+            "Definir por RPM", "Set by RPM",
+            "RPM alvo:", "Target RPM:",
+            "Automatico - a placa/BIOS decide (recomendado no dia a dia)", "Automatic - the card/BIOS decides (recommended for daily use)",
+            "Travar clock do nucleo (MHz):  min", "Lock core clock (MHz):  min",
+            "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
+            "Atualizar a cada:", "Update every:" };
+
+        static Lang()
+        {
+            for (int i = 0; i + 1 < Pairs.Length; i += 2) en[Pairs[i]] = Pairs[i + 1];
+        }
+        public static void Init()
+        {
+            string v = Settings.Get("lang", "auto");
+            if (v == "pt") Cur = 0;
+            else if (v == "en") Cur = 1;
+            else Cur = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLower() == "pt" ? 0 : 1;
+        }
+        public static string T(string pt)
+        {
+            string r;
+            return Cur == 0 || pt == null || !en.TryGetValue(pt, out r) ? pt : r;
+        }
+        static void Tx(object key, string cur, Action<string> set)
+        {
+            string o;
+            if (!orig.TryGetValue(key, out o) || (cur != o && cur != T(o))) { o = cur; orig[key] = o; }
+            string t = T(o);
+            if (t != cur) set(t);
+        }
+        public static void Apply(Control c, ToolTip tip)
+        {
+            if (c == null) return;
+            if (c is Label || c is XpButton || c is XpOption) { if (!string.IsNullOrEmpty(c.Text)) { Control cc = c; Tx(c, c.Text, delegate(string t) { cc.Text = t; }); } }
+            XpGroup g = c as XpGroup;
+            if (g != null && !string.IsNullOrEmpty(g.Title)) Tx(g, g.Title, delegate(string t) { g.Title = t; });
+            ListView lv = c as ListView;
+            if (lv != null) foreach (ColumnHeader h in lv.Columns) { ColumnHeader hh = h; if (!string.IsNullOrEmpty(h.Text)) Tx(h, h.Text, delegate(string t) { hh.Text = t; }); }
+            if (tip != null)
+            {
+                string tt = tip.GetToolTip(c);
+                if (!string.IsNullOrEmpty(tt)) { Control cc2 = c; Tx(tip.GetHashCode() + "|" + c.GetHashCode(), tt, delegate(string t) { tip.SetToolTip(cc2, t); }); }
+            }
+            foreach (Control k in c.Controls) Apply(k, tip);
+        }
+    }
+
     static class Program
     {
         [STAThread]
@@ -129,6 +372,7 @@ namespace BunosTunner
             try
             {
                 Application.SetCompatibleTextRenderingDefault(false);
+                Lang.Init();
                 Xp.SetTheme(Xp.IdOf(Settings.Get("theme", "luna")));
                 Application.EnableVisualStyles();
                 try { PawnIo.CheckAtStartup(null); } catch (Exception) { }
@@ -462,7 +706,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.17.0";
+        public const string Version = "v1.18.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -1293,7 +1537,7 @@ namespace BunosTunner
         Rectangle MinR { get { return new Rectangle(Width - 51, 5, 21, 21); } }
 
         void ApplyPadding() { Padding = new Padding(4, TB, 4, 4); }
-        protected override void OnLoad(EventArgs e) { base.OnLoad(e); Xp.Apply(this); }
+        protected override void OnLoad(EventArgs e) { base.OnLoad(e); Xp.Apply(this); Lang.Apply(this, null); }
         public void RefreshFrame() { ApplyPadding(); UpdateRegion(); Invalidate(); }
         void UpdateRegion()
         {
@@ -9108,7 +9352,7 @@ namespace BunosTunner
             TaskPane left = new TaskPane(); left.Dock = DockStyle.Left; left.Width = 72;
             Panel bar = new Panel(); bar.Dock = DockStyle.Bottom; bar.Height = 30; bar.BackColor = Xp.Face;
             status.AutoSize = false; status.BackColor = Color.Transparent; status.TextAlign = ContentAlignment.MiddleLeft;
-            statusText = SensorHub.Status(); status.SetBounds(6, 7, 640, 16); status.Text = statusText;
+            statusText = SensorHub.Status(); status.SetBounds(6, 7, 300, 16); status.Text = statusText;
             bar.Controls.Add(status);
 
             // doacoes (canto inferior direito)
@@ -9145,11 +9389,23 @@ namespace BunosTunner
             cmb.DropDownStyle = ComboBoxStyle.DropDownList; cmb.Font = Xp.Ui;
             cmb.SetBounds(95, 2, 330, 22);
             right.Controls.Add(cmb);
-            lblTheme = UI.Lbl(right, "Tema:", 436, 6, Xp.UiBold);
-            cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(474, 2, 198, 22);
+            lblTheme = UI.Lbl(bar, "Tema:", 312, 8, Xp.UiBold);
+            cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(356, 4, 150, 22); cbTheme.DropDownWidth = 230;
             cbTheme.Items.AddRange(Xp.ThemeNames);
             cbTheme.SelectedIndex = Xp.Theme;
-            right.Controls.Add(cbTheme);
+            bar.Controls.Add(cbTheme);
+            UI.Lbl(bar, "Idioma:", 514, 8, Xp.UiBold);
+            ComboBox cbLang = new ComboBox(); cbLang.DropDownStyle = ComboBoxStyle.DropDownList; cbLang.Font = Xp.Ui; cbLang.SetBounds(566, 4, 118, 22); cbLang.DropDownWidth = 170;
+            cbLang.Items.AddRange(new object[] { "Auto (Windows)", "Portugu\u00EAs (Brasil)", "English" });
+            string lsv = Settings.Get("lang", "auto");
+            cbLang.SelectedIndex = lsv == "pt" ? 1 : lsv == "en" ? 2 : 0;
+            bar.Controls.Add(cbLang);
+            cbLang.SelectedIndexChanged += delegate
+            {
+                Settings.Set("lang", cbLang.SelectedIndex == 1 ? "pt" : cbLang.SelectedIndex == 2 ? "en" : "auto");
+                Lang.Init();
+                foreach (Form f in Application.OpenForms) Lang.Apply(f, f == this ? tip : null);
+            };
             cbTheme.SelectedIndexChanged += delegate
             {
                 Xp.SetTheme(cbTheme.SelectedIndex);
@@ -9168,6 +9424,7 @@ namespace BunosTunner
             Shown += delegate
             {
                 Startup.Mark("janela mostrada");
+                Lang.Apply(this, tip);
                 Startup.CloseSplash();
                 Startup.Save();
                 StartGpuExtras();

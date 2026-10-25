@@ -1,0 +1,62 @@
+name: Build Buno's Tunner
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # baixa o LibreHardwareMonitorLib 0.9.6 (e as dependencias) do NuGet para a pasta libs
+      - name: Baixar LibreHardwareMonitor
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path lhm | Out-Null
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <TargetFramework>net472</TargetFramework>
+              <OutputType>Library</OutputType>
+            </PropertyGroup>
+            <ItemGroup>
+              <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+            </ItemGroup>
+          </Project>
+          '@ | Set-Content -Path lhm/lhm.csproj -Encoding utf8
+          dotnet build lhm/lhm.csproj -c Release -o lhm/out
+          Get-ChildItem lhm/out -Filter *.dll | Where-Object { $_.Name -ne 'lhm.dll' } | ForEach-Object { Copy-Item $_.FullName libs/ -Force }
+          Get-ChildItem libs
+
+      - name: Compilar
+        shell: cmd
+        run: build.bat
+
+      - name: Ler versao
+        id: ver
+        shell: pwsh
+        run: |
+          $m = Select-String -Path BunosTunner.cs -Pattern 'Version = "(v[0-9.]+)"' | Select-Object -First 1
+          "version=$($m.Matches[0].Groups[1].Value)" >> $env:GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BunosTunner-${{ steps.ver.outputs.version }}
+          path: BunosTunner.exe
+
+      # publica/atualiza um Release com o .exe da versao
+      - name: Publicar Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          gh release view $v 2>$null
+          if ($LASTEXITCODE -eq 0) { gh release upload $v BunosTunner.exe --clobber }
+          else { gh release create $v BunosTunner.exe --title "Buno's Tunner $v" --notes "Build automatica do commit ${{ github.sha }}." }
