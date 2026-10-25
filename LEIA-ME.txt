@@ -240,3 +240,7 @@ CORRECOES v1.7.1
 - Idiomas: padrao = idioma do Windows (portugues ou ingles); seletor "Idioma" na barra inferior (Auto / Portugues / English). Textos fixos dos menus, botoes, titulos e dicas traduzidos; mensagens dinamicas e alguns textos longos ainda aparecem em portugues.
 - Tema e Idioma foram para a barra inferior.
 - GitHub Actions (.github/workflows/build.yml): baixa o LibreHardwareMonitor 0.9.6 do NuGet, compila com build.bat e publica o .exe como artefato e Release.
+
+=== v1.18.1 ===
+- Traducao completa para ingles: janelas de aviso (popups), dicas dos botoes, titulos das janelas (ex.: Sensores), menus de clique direito, listas, caixas de selecao, graficos e mensagens que aparecem durante o uso (status, erros, resultados). A troca de idioma vale na hora.
+- GitHub Actions corrigido: agora baixa a DLL certa do LibreHardwareMonitor, compila e publica o .exe em Releases a cada versao enviada para a main.
