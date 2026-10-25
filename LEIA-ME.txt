@@ -251,3 +251,8 @@ CORRECOES v1.7.1
 === v1.18.3 ===
 - Temas Neon, GTA VI e Steampunk: fundo mais suave por tras dos textos (melhor contraste de leitura).
 - Steampunk (e os demais): a arte de fundo mantem a proporcao original (nao fica mais esticada/esmagada em janelas 4:3); o excesso e cortado de forma centralizada.
+
+=== v1.18.4 ===
+- Traducao: o popup "Escolher pasta ou .exe..." (e qualquer janela simples) agora e traduzido; uma varredura automatica cobre janelas novas.
+- Benchmark de GPU: respeita a placa escolhida no topo. O Windows decide em qual placa o OpenGL abre; se abrir em outra, o teste muda sozinho para OpenCL na placa selecionada (com aviso). O cartao da GPU mostra qual placa sera usada.
+- Menu Benchmark redesenhado: grade de 2 colunas com um cartao por teste (icone, descricao, duracao e opcoes) e um cartao "Controle e seguranca" (limite de temperatura, progresso, sequencia e mensagens).

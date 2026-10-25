@@ -357,6 +357,12 @@ namespace BunosTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "Placa:", "Card:",
+            "Controle e seguranca", "Control and safety",
+            "A placa e a escolhida la em cima. Se o OpenGL abrir em outra, o teste muda para OpenCL na escolhida.", "The card is the one chosen at the top. If OpenGL opens on another one, the test switches to OpenCL on the chosen card.",
+            "O OpenGL abriu na placa '", "OpenGL opened on card '",
+            "', diferente da selecionada ('", "', different from the selected one ('",
+            "'): usando o teste OpenCL na placa selecionada.", "'): using the OpenCL test on the selected card.",
             "Erros: ", "Errors: ",
             "FPS do render: ", "Render FPS: ",
             "Pontos: ", "Score: ",
@@ -1360,13 +1366,17 @@ namespace BunosTunner
         {
             if (sweeper != null) return;
             sweeper = new Timer();
-            sweeper.Interval = 500;
+            sweeper.Interval = 250;
             sweeper.Tick += delegate
             {
                 if (Cur == 0) return;
                 List<Form> fs = new List<Form>();
                 foreach (Form f0 in Application.OpenForms) fs.Add(f0);
-                foreach (Form f in fs) Sweep(f, false);
+                foreach (Form f in fs)
+                {
+                    if (!hookedAdd.Contains(f)) Apply(f, null);   // janela simples criada sem passar pela traducao
+                    Sweep(f, false);
+                }
             };
             sweeper.Start();
         }
@@ -1721,7 +1731,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.18.3";
+        public const string Version = "v1.18.4";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -7111,8 +7121,9 @@ namespace BunosTunner
         [UnmanagedFunctionPointer(CallingConvention.StdCall)] delegate int DSwapInterval(int i);
 
         public volatile int State; // 0 iniciando, 1 ok, 2 falhou
-        public string Error = "";
-        volatile bool quit; volatile int vw = 640, vh = 400;
+        public string Error = "", Renderer = "";
+        volatile bool quit;
+        public void StopRender() { quit = true; } volatile int vw = 640, vh = 400;
         Th.Thread th;
 
         public GlCanvas()
@@ -7213,6 +7224,7 @@ namespace BunosTunner
                     col[i * 8 + 4] = 1.0f; col[i * 8 + 5] = 0.75f + (float)rnd.NextDouble() * 0.2f; col[i * 8 + 6] = 0.1f; col[i * 8 + 7] = 0.5f;
                 }
                 hv = GCHandle.Alloc(pos, GCHandleType.Pinned); hc = GCHandle.Alloc(col, GCHandleType.Pinned);
+                Renderer = rend ?? "";
                 Bench.Extra = rend + (prog != 0 ? "  |  shader + pelos OpenGL" : "  |  pelos OpenGL");
                 State = 1;
                 DateTime t0 = DateTime.UtcNow;
@@ -7290,6 +7302,26 @@ namespace BunosTunner
     static class Bench
     {
         public static volatile bool Stop;
+        static readonly string[] VendorWords = { "nvidia", "amd", "intel", "corporation", "graphics", "series", "generation", "laptop", "gpu", "pcie", "sse2", "microsoft" };
+        static List<string> NameTokens(string s)
+        {
+            List<string> l = new List<string>();
+            if (string.IsNullOrEmpty(s)) return l;
+            int sl = s.IndexOf('/'); if (sl > 0) s = s.Substring(0, sl);
+            foreach (string w in Regex.Split(s.ToLower(), "[^a-z0-9]+"))
+                if (w.Length >= 2 && Array.IndexOf(VendorWords, w) < 0 && w != "r" && w != "tm") l.Add(w);
+            return l;
+        }
+        // compara o nome da GPU (WMI/NVML) com o do OpenGL/OpenCL, tolerando diferencas de formato
+        public static bool GpuNameMatch(string a, string b)
+        {
+            List<string> ta = NameTokens(a), tb = NameTokens(b);
+            if (ta.Count == 0 || tb.Count == 0) return false;
+            List<string> small = ta.Count <= tb.Count ? ta : tb, big = ta.Count <= tb.Count ? tb : ta;
+            int hit = 0;
+            foreach (string w in small) if (big.Contains(w)) hit++;
+            return hit == small.Count || (hit >= 2 && hit * 10 >= small.Count * 8);
+        }
         public static long Counter, Errors;
         public static volatile string Extra = "", Fail;
         static int alive;
@@ -7547,7 +7579,7 @@ namespace BunosTunner
                     string n = sb.ToString().Trim();
                     if (first == IntPtr.Zero) { first = d; firstName = n; }
                     if (dev == IntPtr.Zero && gpuName != null && n.Length > 0 &&
-                        (gpuName.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf(gpuName, StringComparison.OrdinalIgnoreCase) >= 0)) { dev = d; devName = n; }
+                        (gpuName.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0 || n.IndexOf(gpuName, StringComparison.OrdinalIgnoreCase) >= 0 || GpuNameMatch(n, gpuName))) { dev = d; devName = n; }
                 }
             }
             if (dev == IntPtr.Zero) { dev = first; devName = firstName; }
@@ -9406,6 +9438,7 @@ namespace BunosTunner
                 XpButton be = new XpButton(); be.Text = "Exe"; be.SetBounds(140, 80, 100, 28); be.Click += delegate { res = 2; f.Close(); }; f.Controls.Add(be);
                 XpButton bc = new XpButton(); bc.Text = "Cancelar"; bc.SetBounds(250, 80, 100, 28); bc.Click += delegate { res = 0; f.Close(); }; f.Controls.Add(bc);
                 f.CancelButton = null;
+                Lang.Apply(f, null);
                 f.ShowDialog(this);
             }
             return res;
@@ -11060,19 +11093,19 @@ namespace BunosTunner
         ComboBox cbBThrF;
         XpButton btnBSeq;
 
-        // um bloco por teste: titulo, opcoes do proprio teste e, a direita, o icone que inicia/para
+        // um cartao por teste (grade de 2 colunas): icone que inicia/para, descricao, duracao e opcoes do teste
         XpGroup BenchBlock(int k, string title, string desc, string icon, string tipText)
         {
-            XpGroup g = new XpGroup(); g.Title = title; g.SetBounds(0, k * 70, 676, 66);
-            XpIconButton b = new XpIconButton(icon, 48); b.Location = new Point(676 - 48 - 12, 8); b.Badge = 1;
+            XpGroup g = new XpGroup(); g.Title = title; g.SetBounds((k % 2) * 342, (k / 2) * 192, 334, 184);
+            XpIconButton b = new XpIconButton(icon, 48); b.Location = new Point(12, 30); b.Badge = 1;
             int kk = k;
             b.Click += delegate { ToggleBench(kk); };
             tip.SetToolTip(b, tipText);
             g.Controls.Add(b); bBtn[k] = b;
-            UI.Lbl(g, "Duracao:", 14, 28);
-            cbDurK[k] = Combo(g, 76, 24, 96, "30 s", "1 min", "5 min", "10 min", "Ate parar"); cbDurK[k].SelectedIndex = 1;
-            Label d = UI.Lbl(g, desc, 14, 49, Xp.Ui, Xp.Dim);
-            d.AutoSize = false; d.SetBounds(14, 49, 590, 15);
+            Label d = UI.Lbl(g, desc, 72, 28, Xp.Ui, Xp.Dim);
+            d.AutoSize = false; d.SetBounds(72, 28, 252, 58);
+            UI.Lbl(g, "Duracao:", 12, 96);
+            cbDurK[k] = Combo(g, 76, 92, 110, "30 s", "1 min", "5 min", "10 min", "Ate parar"); cbDurK[k].SelectedIndex = 1;
             return g;
         }
 
@@ -11081,28 +11114,33 @@ namespace BunosTunner
             Panel p = new Panel(); p.Dock = DockStyle.Fill;
 
             XpGroup gG = BenchBlock(0, "GPU  -  render 3D (estilo FurMark)", "Abre uma janela OpenGL com shader e pelos e mostra o FPS. Fechar a janela para o teste.", "gpu", "Iniciar / parar o estresse de GPU");
+            UI.Lbl(gG, "Placa:", 12, 128);
+            lblBGpu = UI.Lbl(gG, cur != null ? cur.Name : "-", 56, 128, Xp.UiBold, Xp.GroupText);
+            lblBGpu.AutoSize = false; lblBGpu.SetBounds(56, 128, 268, 16);
+            Label gn = UI.Lbl(gG, "A placa e a escolhida la em cima. Se o OpenGL abrir em outra, o teste muda para OpenCL na escolhida.", 12, 150, Xp.Ui, Xp.Dim);
+            gn.AutoSize = false; gn.SetBounds(12, 150, 312, 30);
             p.Controls.Add(gG);
 
             XpGroup gC = BenchBlock(1, "CPU  -  ray tracing 3D (estilo Cinebench)", "Renderiza uma cena em todos os nucleos, bloco a bloco. Pontos = Mrays/s x 100.", "chip", "Iniciar / parar o estresse de CPU");
-            UI.Lbl(gC, "Threads:", 190, 28);
-            cbBThr = Combo(gC, 250, 24, 110, "Todas", "Metade", "1");
+            UI.Lbl(gC, "Threads:", 12, 128);
+            cbBThr = Combo(gC, 76, 124, 110, "Todas", "Metade", "1");
             p.Controls.Add(gC);
 
             XpGroup gF = BenchBlock(2, "FPU  -  campo de ondas em ponto flutuante", "Calculo de ondas com seno/cosseno em todos os nucleos; mostra GFLOPS estimado.", "fpu", "Iniciar / parar o estresse de FPU");
-            UI.Lbl(gF, "Threads:", 190, 28);
-            cbBThrF = Combo(gF, 250, 24, 110, "Todas", "Metade", "1");
+            UI.Lbl(gF, "Threads:", 12, 128);
+            cbBThrF = Combo(gF, 76, 124, 110, "Todas", "Metade", "1");
             cbBThr.SelectedIndexChanged += delegate { if (cbBThrF.SelectedIndex != cbBThr.SelectedIndex) cbBThrF.SelectedIndex = cbBThr.SelectedIndex; };
             cbBThrF.SelectedIndexChanged += delegate { if (cbBThr.SelectedIndex != cbBThrF.SelectedIndex) cbBThr.SelectedIndex = cbBThrF.SelectedIndex; };
             p.Controls.Add(gF);
 
             XpGroup gR = BenchBlock(3, "RAM  -  escrita e leitura com verificacao", "Grava e le padroes na memoria e confere cada valor; qualquer diferenca conta como erro.", "ram", "Iniciar / parar o estresse de RAM");
-            UI.Lbl(gR, "Usar (% da livre):", 190, 28);
-            cbBRam = Combo(gR, 300, 24, 70, "25%", "50%", "70%"); cbBRam.SelectedIndex = 1;
+            UI.Lbl(gR, "Usar (% da livre):", 12, 128);
+            cbBRam = Combo(gR, 124, 124, 70, "25%", "50%", "70%"); cbBRam.SelectedIndex = 1;
             p.Controls.Add(gR);
 
             XpGroup gS = BenchBlock(4, "SSD  -  sequencial + 4K aleatorio", "Usa um arquivo temporario no drive escolhido (apagado ao fim). Em 'Ate parar' gera desgaste.", "ssd", "Iniciar / parar o estresse de SSD");
-            UI.Lbl(gS, "Drive:", 190, 28);
-            cbBDrive = Combo(gS, 232, 24, 70);
+            UI.Lbl(gS, "Drive:", 12, 128);
+            cbBDrive = Combo(gS, 56, 124, 70);
             foreach (DriveInfo d in DriveInfo.GetDrives())
             {
                 try { if (d.DriveType == DriveType.Fixed && d.IsReady) cbBDrive.Items.Add(d.Name); } catch (Exception) { }
@@ -11112,19 +11150,21 @@ namespace BunosTunner
                 int si = cbBDrive.Items.IndexOf(Path.GetPathRoot(Environment.SystemDirectory));
                 cbBDrive.SelectedIndex = si >= 0 ? si : 0;
             }
-            UI.Lbl(gS, "Tamanho:", 316, 28);
-            cbBSize = Combo(gS, 375, 24, 80, "512 MB", "1 GB", "2 GB", "4 GB"); cbBSize.SelectedIndex = 1;
+            UI.Lbl(gS, "Tamanho:", 146, 128);
+            cbBSize = Combo(gS, 206, 124, 90, "512 MB", "1 GB", "2 GB", "4 GB"); cbBSize.SelectedIndex = 1;
             p.Controls.Add(gS);
 
-            // faixa comum: seguranca, progresso e sequencia
-            chkBSafe = UI.Opt(p, "Parar se passar de", 0, 354, 130, false); chkBSafe.Checked = true;
-            txBTemp = UI.Txt(p, 134, 351, 40, "95");
-            UI.Lbl(p, "\u00B0C", 178, 355);
-            pbBench = new XpProgress(); pbBench.SetBounds(206, 353, 240, 18);
-            p.Controls.Add(pbBench);
-            btnBSeq = UI.Btn(p, "Rodar sequencia (CPU, FPU, RAM, GPU)", 456, 349, 220, delegate { ToggleSeq(); });
-            btnBSeq.Height = 26;
+            // cartao de controle: seguranca, progresso, sequencia e mensagens
+            XpGroup gK = new XpGroup(); gK.Title = "Controle e seguranca"; gK.SetBounds(342, 384, 334, 184);
+            chkBSafe = UI.Opt(gK, "Parar se passar de", 12, 28, 150, false); chkBSafe.Checked = true;
+            txBTemp = UI.Txt(gK, 168, 25, 40, "95");
+            UI.Lbl(gK, "\u00B0C", 212, 29);
+            pbBench = new XpProgress(); pbBench.SetBounds(12, 60, 310, 18);
+            gK.Controls.Add(pbBench);
+            btnBSeq = UI.Btn(gK, "Rodar sequencia (CPU, FPU, RAM, GPU)", 12, 88, 310, delegate { ToggleSeq(); });
+            btnBSeq.Height = 28;
             tip.SetToolTip(btnBSeq, "Roda CPU, FPU, RAM e GPU um apos o outro, cada um com a duracao do seu bloco (o SSD fica de fora para nao gerar desgaste).");
+            p.Controls.Add(gK);
             BenchRestore();
 
             XpGroup g3 = new XpGroup(); g3.Title = "Resultado ao vivo"; g3.SetBounds(0, 380, 676, 204);
@@ -11151,8 +11191,8 @@ namespace BunosTunner
             XpButton bCsv = UI.Btn(g3, "Salvar CSV", 330, 178, 84, delegate { BenchCsv(); });
             XpButton bClr = UI.Btn(g3, "Limpar", 420, 178, 64, delegate { lvBench.Items.Clear(); });
             bCopy.Height = bCsv.Height = bClr.Height = 22;
-            // "Resultado ao vivo" removido da tela: os controles ficam fora da pagina; so a linha de status permanece
-            lblBMsg.Parent = p; lblBMsg.SetBounds(0, 386, 676, 60);
+            // "Resultado ao vivo" fica fora da tela (os controles continuam existindo); so a linha de status aparece, no cartao de controle
+            lblBMsg.Parent = gK; lblBMsg.SetBounds(12, 122, 310, 58);
 
             tmBench.Interval = 1000;
             tmBench.Tick += delegate { try { BenchTick(); } catch (Exception) { } };
@@ -11166,6 +11206,7 @@ namespace BunosTunner
             ToggleBench(-1);
         }
 
+        bool bGlChecked; Label lblBGpu;
         double bSq; Queue<int> bQueue = new Queue<int>(); bool bSeqRun;
         void BenchRestore()
         {
@@ -11251,7 +11292,7 @@ namespace BunosTunner
                 if (drive == null) { lblBMsg.Text = "Nenhum drive disponivel para o teste de SSD."; return; }
                 if (bDurSec == 0 && Dlg.Show("Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             }
-            BenchSave(kind);
+            BenchSave(kind); bGlChecked = false;
             string gname = cur != null ? cur.Name : null;
             bExt = kind <= 2; bU = BUnit[kind]; bSc = BScale[kind];
             if (kind == 0) { bU = "FPS"; bSc = 1.0; }
@@ -11306,6 +11347,22 @@ namespace BunosTunner
         void BenchTick()
         {
             if (!bRunning) return;
+            if (bExt && bKind == 0 && !bGlChecked && rf != null && rf.Gl != null && rf.Gl.State == 1 && rf.Gl.Renderer.Length > 0)
+            {
+                bGlChecked = true;
+                string want = cur != null ? cur.Name : null;
+                if (want != null && cmb.Items.Count > 1 && !Bench.GpuNameMatch(rf.Gl.Renderer, want))
+                {
+                    // o Windows escolhe a placa do OpenGL; para respeitar a placa selecionada, usa o OpenCL nela
+                    string got = rf.Gl.Renderer;
+                    rf.Gl.StopRender();
+                    bExt = false; bU = BUnit[0]; bSc = BScale[0]; bLast = 0; bLastT = DateTime.UtcNow;
+                    if (rf.Cv != null) rf.Cv.Unit = bU;
+                    lblBMsg.Text = "O OpenGL abriu na placa '" + got + "', diferente da selecionada ('" + want + "'): usando o teste OpenCL na placa selecionada.";
+                    bFallback();
+                    return;
+                }
+            }
             if (bExt && bKind == 0 && rf != null && rf.Gl != null && rf.Gl.State == 2)
             {
                 bExt = false; bU = BUnit[0]; bSc = BScale[0]; bLast = 0; bLastT = DateTime.UtcNow;
@@ -11508,6 +11565,7 @@ namespace BunosTunner
         {
             cur = cmb.SelectedItem as Gpu;
             if (cur == null) return;
+            if (lblBGpu != null) lblBGpu.Text = cur.Name;
             fanPage.SetGpu(cur);
 
             LoadOc();
