@@ -2,7 +2,7 @@ BUNO'S TUNNER  -  GPU Tweaker (visual Windows XP, portable)
 =============================================================
 
 O QUE E
-  Programa de arquivo unico (BunosTunner.exe), sem instalacao. Controla ventoinhas
+  Programa de arquivo unico (BunoTunner.exe), sem instalacao. Controla ventoinhas
   (% e RPM), faz overclock (NVIDIA), mostra todas as especificacoes e sensores.
 
 COMO GERAR O .EXE (1 vez, ~2 minutos, nao precisa instalar Visual Studio)
@@ -10,8 +10,8 @@ COMO GERAR O .EXE (1 vez, ~2 minutos, nao precisa instalar Visual Studio)
      aba Releases, arquivo .zip). Prefira a versao 0.9.4 (driver embutido, 100% portable);
      versoes mais novas podem pedir o driver PawnIO para ler placa-mae/CPU.
   2) Extraia o zip e copie TODAS as arquivos .dll para a pasta "libs" (ao lado do build.bat).
-  3) De dois cliques em build.bat  ->  gera BunosTunner.exe (usa o compilador que ja vem no Windows).
-  4) Execute BunosTunner.exe (ele pede permissao de Administrador; e necessario).
+  3) De dois cliques em build.bat  ->  gera BunoTunner.exe (usa o compilador que ja vem no Windows).
+  4) Execute BunoTunner.exe (ele pede permissao de Administrador; e necessario).
   O .exe final carrega as DLLs dentro dele: pode copiar so ele para um pendrive.
 
 REQUISITOS
@@ -26,7 +26,7 @@ LIMITES REAIS (nao e falha do programa)
 
 DOACOES (PayPal / LivePix)
   Os dois icones no canto inferior direito abrem o PayPal e a LivePix. Para trocar os links, edite
-  PayPalUrl e LivePixUrl em BunosTunner.cs (classe MainForm) e rode build.bat de novo.
+  PayPalUrl e LivePixUrl em BunoTunner.cs (classe MainForm) e rode build.bat de novo.
 
 SOBRE TRAVADAS
   A leitura dos sensores agora roda em segundo plano (discos so a cada 5 s), a janela nao trava mais.
@@ -37,7 +37,7 @@ SE O OC DE CORE/MEMORIA FALHAR
   Me mande essa mensagem que eu ajusto.
 
 VERSAO v1.1.0
-  - A versao aparece no canto inferior esquerdo do painel lateral (Xp.Version em BunosTunner.cs).
+  - A versao aparece no canto inferior esquerdo do painel lateral (Xp.Version em BunoTunner.cs).
   - Nova pagina "Especificacoes da CPU" (icone abaixo do da GPU). Precisa de System.Management (ja no build.bat).
   - Memory clock agora e digitado em MHz reais; o programa envia o dobro ao driver (MemFactor = 2).
 
@@ -49,11 +49,11 @@ VERSAO v1.2.0 - SENSORES REPAGINADOS
     mesmo com a janela de sensores fechada), copiar nome/valor, zerar min/max.
   - Grafico: janela de 1 a 30 min, pausar, legenda com valor atual, cursor mostra o valor de cada linha.
   - Exportar: valores atuais (CSV), historico do grafico (CSV) e imagem (PNG).
-  - O programa lembra seus sensores marcados, janela e alertas no arquivo BunosTunner.ini (ao lado do .exe).
+  - O programa lembra seus sensores marcados, janela e alertas no arquivo BunoTunner.ini (ao lado do .exe).
 
 VERSAO v1.3.0
   TEMAS: seletor "Tema" no canto superior direito (ao lado da escolha da GPU): Luna (Windows XP) ou
-         Frutiger Aero (Windows 7). A escolha fica salva no BunosTunner.ini.
+         Frutiger Aero (Windows 7). A escolha fica salva no BunoTunner.ini.
   ESPECIFICACOES: CPU e GPU agora mostram recursos ligados/desligados (verde/vermelho): Secure Boot, UEFI,
          TPM, virtualizacao, SLAT, DEP, VBS, integridade de memoria, Hyper-V, Fast Startup, SMT,
          Resizable BAR, Above 4G Decoding, HAGS, Game Mode, ECC, limitacao de clock e mais.
@@ -105,7 +105,7 @@ VERSAO v1.6.0
   - ICONES na ordem do EXEMPLO.png: CPU, GPU, RAM, Ventoinhas, OC da GPU, Benchmark | Afinidade, Sensores.
   - VENTOINHAS simplificado como no EXEMPLO.png: lista, Identificar, Tudo automatico, modo Automatico/Manual (com RPM alvo),
     Aplicar e seguranca. Selecionar por tipo (CPU/bombas/gabinete/GPU) e Renomear agora ficam no menu do botao direito da lista.
-  - RAM / TIMINGS: coloque a pasta do ZenTimings (com ZenTimings.exe) ao lado do BunosTunner.exe (ou em tools\).
+  - RAM / TIMINGS: coloque a pasta do ZenTimings (com ZenTimings.exe) ao lado do BunoTunner.exe (ou em tools\).
     Ao abrir a aba Memoria o programa abre o ZenTimings minimizado, le os valores da janela dele, e fecha.
     (So AMD Ryzen. Se o ZenTimings nao estiver na pasta, o resumo da memoria continua funcionando normalmente.)
   - TEMA Windows 7 (Frutiger Aero): moldura de vidro de 8 px com reflexos, brilho na barra de titulo, painel lateral
@@ -129,14 +129,14 @@ VERSAO v1.7.0
       * O que a placa/driver nao expoe aparece como "(indisponivel)" com o motivo.
   - NVIDIA notebook: a aba OC agora detecta o que a placa realmente permite (TDP fixo, faixa de offset desconhecida...), so aplica
     o que mudou, tenta NVML antigo -> NVML novo -> NvAPI (estrutura v2 e v1) e mostra o motivo exato do erro.
-  - Icone embutido no .exe (BunosTunner.ico, a esfera dourada). Mantenha o .ico ao lado do build.bat.
+  - Icone embutido no .exe (BunoTunner.ico, a esfera dourada). Mantenha o .ico ao lado do build.bat.
   - 4 NOVOS TEMAS (seletor no topo, ao lado da GPU): Dark Mode (Escuro / AMOLED), Neon / Cyberpunk, Steampunk, Retro / Vintage
     (alem de Luna e Frutiger Aero). O tema e lembrado entre aberturas.
 
 CORRECOES v1.7.1
   - Removidos os avisos CS0649 (campos do tema preenchidos por reflexao).
   - Aba Memoria: textos com acentos e layout que nao estoura com as fontes dos temas.
-  - Para testar problema de temperatura da CPU: no BunosTunner.ini adicione a linha vendoroc=0 (desliga os backends AMD/Intel de OC).
+  - Para testar problema de temperatura da CPU: no BunoTunner.ini adicione a linha vendoroc=0 (desliga os backends AMD/Intel de OC).
 
 
 === v1.8.0 ===
@@ -195,8 +195,8 @@ CORRECOES v1.7.1
 
 === v1.12.0 ===
 - OC da AMD: o ADL agora lista tambem placas sem monitor ligado, le o tamanho real da estrutura do driver e aceita o adaptador pelo nome (Radeon/AMD). Se ainda falhar, a mensagem mostra os adaptadores que o driver informou. Nome da GPU em branco corrigido (usa o nome do Windows).
-- Abertura mais rapida: tela de abertura com a etapa atual; discos (SMART), rede, bateria e zonas ACPI carregam em segundo plano (a janela nao espera mais por eles). O arquivo BunosTunner_startup.log (ao lado do .exe) lista o tempo de cada etapa - se ainda estiver lento, envie esse arquivo.
-- Novo menu "Desinstalador" (entre Afinidade e Sensores): lista os programas, desinstala com o desinstalador oficial e procura o que sobrou (pastas, atalhos, registro, inicializacao, servicos, tarefas agendadas). "Remocao forcada" para o que se recusa a desinstalar; "Escolher pasta ou .exe" para programas portateis. Revise a lista (itens de certeza media vem desmarcados), pastas vao para a Lixeira, chaves do registro sao salvas em BunosTunner_backup antes de apagar, ponto de restauracao opcional. Pastas do sistema sao protegidas.
+- Abertura mais rapida: tela de abertura com a etapa atual; discos (SMART), rede, bateria e zonas ACPI carregam em segundo plano (a janela nao espera mais por eles). O arquivo BunoTunner_startup.log (ao lado do .exe) lista o tempo de cada etapa - se ainda estiver lento, envie esse arquivo.
+- Novo menu "Desinstalador" (entre Afinidade e Sensores): lista os programas, desinstala com o desinstalador oficial e procura o que sobrou (pastas, atalhos, registro, inicializacao, servicos, tarefas agendadas). "Remocao forcada" para o que se recusa a desinstalar; "Escolher pasta ou .exe" para programas portateis. Revise a lista (itens de certeza media vem desmarcados), pastas vao para a Lixeira, chaves do registro sao salvas em BunoTunner_backup antes de apagar, ponto de restauracao opcional. Pastas do sistema sao protegidas.
 - Benchmark refeito: um bloco por teste (GPU, CPU, FPU, RAM, SSD) com as opcoes dentro dele e, a direita, o icone que inicia/para o teste; botao "Rodar sequencia" e faixa de seguranca comuns.
 - build.bat agora referencia Microsoft.VisualBasic.dll (envio para a Lixeira).
 
@@ -256,3 +256,7 @@ CORRECOES v1.7.1
 - Traducao: o popup "Escolher pasta ou .exe..." (e qualquer janela simples) agora e traduzido; uma varredura automatica cobre janelas novas.
 - Benchmark de GPU: respeita a placa escolhida no topo. O Windows decide em qual placa o OpenGL abre; se abrir em outra, o teste muda sozinho para OpenCL na placa selecionada (com aviso). O cartao da GPU mostra qual placa sera usada.
 - Menu Benchmark redesenhado: grade de 2 colunas com um cartao por teste (icone, descricao, duracao e opcoes) e um cartao "Controle e seguranca" (limite de temperatura, progresso, sequencia e mensagens).
+
+=== v1.19.0 ===
+- Aplicativo renomeado para BunoTunner (BunoTunner.exe, BunoTunner.cs, BunoTunner.ini; pastas de backup/log tambem). Se existir um BunosTunner.ini antigo ao lado do .exe, as configuracoes sao copiadas automaticamente.
+- Ao clicar no X, o programa minimiza para a bandeja do sistema e continua funcionando (ventoinhas, alertas, etc.). Duplo clique no icone da bandeja reabre; clique direito: Abrir / Sair e a opcao de ligar ou desligar esse comportamento do X.

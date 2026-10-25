@@ -1,4 +1,4 @@
-# Buno's Tunner
+# BunoTunner
 
 Utilitario portatil (sem instalacao) para Windows, com visual estilo Windows XP: ventoinhas, overclock de GPU (NVIDIA/AMD/Intel), sensores, benchmark, timings de RAM, afinidade de processos, desinstalador, saude de armazenamento, teste de internet e otimizacoes do Windows.
 

@@ -1,5 +1,5 @@
 // =====================================================================
-//  Buno's Tunner  -  controle de ventoinhas / OC / sensores (visual Windows XP)
+//  BunoTunner  -  controle de ventoinhas / OC / sensores (visual Windows XP)
 //  Compila com o csc.exe que ja vem no Windows (C# 5, .NET Framework 4.x)
 //  Veja LEIA-ME.txt
 // =====================================================================
@@ -25,12 +25,12 @@ using System.Windows.Forms;
 using LHM = LibreHardwareMonitor.Hardware;
 using Th = System.Threading;
 
-namespace BunosTunner
+namespace BunoTunner
 {
     // ------------------------------------------------------------------
     //  Entrada. As DLLs do LibreHardwareMonitor ficam embutidas no .exe
     // ------------------------------------------------------------------
-    // Registro de tempos da abertura (BunosTunner_startup.log) + tela de abertura
+    // Registro de tempos da abertura (BunoTunner_startup.log) + tela de abertura
     static class Startup
     {
         static Stopwatch sw = Stopwatch.StartNew();
@@ -54,8 +54,8 @@ namespace BunosTunner
             try
             {
                 lock (lk)
-                    System.IO.File.WriteAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunosTunner_startup.log"),
-                        "Buno's Tunner - tempos da abertura (cada linha: tempo total, tempo desta etapa)\r\n" + log.ToString());
+                    System.IO.File.WriteAllText(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunoTunner_startup.log"),
+                        "BunoTunner - tempos da abertura (cada linha: tempo total, tempo desta etapa)\r\n" + log.ToString());
             }
             catch (Exception) { }
         }
@@ -102,7 +102,7 @@ namespace BunosTunner
             g.Clear(Xp.Face);
             using (Pen p = new Pen(Xp.CapFrame, 2)) g.DrawRectangle(p, 1, 1, Width - 3, Height - 3);
             using (Font f = new Font(Xp.Ui.FontFamily, 15f, FontStyle.Bold))
-                TextRenderer.DrawText(g, "Buno's Tunner", f, new Point(18, 14), Xp.Text);
+                TextRenderer.DrawText(g, "BunoTunner", f, new Point(18, 14), Xp.Text);
             TextRenderer.DrawText(g, Lang.T("Carregando sensores e hardware..."), Xp.Ui, new Point(20, 50), Xp.Text);
             string st = Lang.T(Startup.Status ?? "");
             if (st.Length > 52) st = st.Substring(0, 52);
@@ -357,6 +357,10 @@ namespace BunosTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "Abrir BunoTunner", "Open BunoTunner",
+            "Minimizar para a bandeja ao clicar no X", "Minimize to tray when clicking X",
+            "Continua rodando na bandeja. Clique duas vezes no icone para abrir.", "Still running in the tray. Double-click the icon to open.",
+            "Sair", "Exit",
             "Placa:", "Card:",
             "Controle e seguranca", "Control and safety",
             "A placa e a escolhida la em cima. Se o OpenGL abrir em outra, o teste muda para OpenCL na escolhida.", "The card is the one chosen at the top. If OpenGL opens on another one, the test switches to OpenCL on the chosen card.",
@@ -402,7 +406,7 @@ namespace BunosTunner
             " (sequencia cancelada)", " (sequence cancelled)",
             " (so leitura)", " (read-only)",
             " CPUs marcados", " CPUs checked",
-            " Copias do registro em BunosTunner_backup.", " Registry copies in BunosTunner_backup.",
+            " Copias do registro em BunoTunner_backup.", " Registry copies in BunoTunner_backup.",
             " MB liberados.", " MB freed.",
             " MB/s | 4K aleatorio ", " MB/s | random 4K ",
             " MB/s | Leitura seq ", " MB/s | Seq. read ",
@@ -506,8 +510,8 @@ namespace BunosTunner
             "Alerta", "Alert",
             "Alta", "High",
             "Aplicar tambem a TODOS os processos com o mesmo nome", "Also apply to ALL processes with the same name",
-            "Apoie o Buno's Tunner via LivePix", "Support Buno's Tunner via LivePix",
-            "Apoie o Buno's Tunner via PayPal", "Support Buno's Tunner via PayPal",
+            "Apoie o BunoTunner via LivePix", "Support BunoTunner via LivePix",
+            "Apoie o BunoTunner via PayPal", "Support BunoTunner via PayPal",
             "Armazenamento (HD/SSD)", "Storage (HDD/SSD)",
             "Armazenamento", "Storage",
             "Arquitetura", "Architecture",
@@ -527,19 +531,19 @@ namespace BunosTunner
             "Bomba/AIO", "Pump/AIO",
             "Boot em modo UEFI (necessario p/ ReBAR)", "UEFI boot mode (required for ReBAR)",
             "Boot em modo UEFI", "UEFI boot mode",
-            "Buno's Tunner - Adicionar manualmente", "Buno's Tunner - Add manually",
-            "Buno's Tunner - Dados pessoais", "Buno's Tunner - Personal data",
-            "Buno's Tunner - Desinstalar", "Buno's Tunner - Uninstall",
-            "Buno's Tunner - Otimizacoes", "Buno's Tunner - Optimizations",
-            "Buno's Tunner - PawnIO recomendado", "Buno's Tunner - PawnIO recommended",
-            "Buno's Tunner - Remocao forcada", "Buno's Tunner - Forced removal",
-            "Buno's Tunner - Remover", "Buno's Tunner - Remove",
-            "Buno's Tunner - Render do teste (Esc fecha e para)", "Buno's Tunner - Test render (Esc closes and stops)",
-            "Buno's Tunner - Sensores (GPU, CPU, placa-mae, memoria, discos, ventoinhas...)", "Buno's Tunner - Sensors (GPU, CPU, motherboard, memory, disks, fans...)",
-            "Buno's Tunner - Sensores", "Buno's Tunner - Sensors",
-            "Buno's Tunner - diagnostico dos timings", "Buno's Tunner - timings diagnostics",
-            "Buno's Tunner - erro fatal", "Buno's Tunner - fatal error",
-            "Buno's Tunner - tempos da abertura (cada linha: tempo total, tempo desta etapa)\r\n", "Buno's Tunner - startup timings (each line: total time, time of this step)\r\n",
+            "BunoTunner - Adicionar manualmente", "BunoTunner - Add manually",
+            "BunoTunner - Dados pessoais", "BunoTunner - Personal data",
+            "BunoTunner - Desinstalar", "BunoTunner - Uninstall",
+            "BunoTunner - Otimizacoes", "BunoTunner - Optimizations",
+            "BunoTunner - PawnIO recomendado", "BunoTunner - PawnIO recommended",
+            "BunoTunner - Remocao forcada", "BunoTunner - Forced removal",
+            "BunoTunner - Remover", "BunoTunner - Remove",
+            "BunoTunner - Render do teste (Esc fecha e para)", "BunoTunner - Test render (Esc closes and stops)",
+            "BunoTunner - Sensores (GPU, CPU, placa-mae, memoria, discos, ventoinhas...)", "BunoTunner - Sensors (GPU, CPU, motherboard, memory, disks, fans...)",
+            "BunoTunner - Sensores", "BunoTunner - Sensors",
+            "BunoTunner - diagnostico dos timings", "BunoTunner - timings diagnostics",
+            "BunoTunner - erro fatal", "BunoTunner - fatal error",
+            "BunoTunner - tempos da abertura (cada linha: tempo total, tempo desta etapa)\r\n", "BunoTunner - startup timings (each line: total time, time of this step)\r\n",
             "COMO USAR OS SENSORES\n\n", "HOW TO USE THE SENSORS\n\n",
             "CPU - consumo", "CPU - power",
             "CPU - render 3D por blocos (ray tracing)", "CPU - block-based 3D render (ray tracing)",
@@ -597,7 +601,7 @@ namespace BunosTunner
             "Data do driver (registro)", "Driver date (registry)",
             "Data do driver", "Driver date",
             "Definir alerta (acima de...)", "Set alert (above...)",
-            "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o Buno's Tunner novamente.", "After downloading, run PawnIO_setup.exe (as administrator), finish the installation and open Buno's Tunner again.",
+            "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o BunoTunner novamente.", "After downloading, run PawnIO_setup.exe (as administrator), finish the installation and open BunoTunner again.",
             "Desativar o Isolamento de nucleo reduz a protecao contra malware que ataca o nucleo do Windows. Desativar mesmo assim?", "Disabling Core isolation reduces protection against malware that attacks the Windows kernel. Disable anyway?",
             "Desconhecida", "Unknown",
             "Descricao: ", "Description: ",
@@ -828,7 +832,7 @@ namespace BunosTunner
             "NvAPI sem SetPstates20", "NvAPI without SetPstates20",
             "NvAPI_Initialize erro ", "NvAPI_Initialize error ",
             "Não consegui ler: ", "Could not read: ",
-            "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo Buno's Tunner) precisa para acessar o hardware. ", "PawnIO is a signed, open-source driver that LibreHardwareMonitor (used by Buno's Tunner) needs to access the hardware. ",
+            "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo BunoTunner) precisa para acessar o hardware. ", "PawnIO is a signed, open-source driver that LibreHardwareMonitor (used by BunoTunner) needs to access the hardware. ",
             "O PawnIO ja esta instalado.", "PawnIO is already installed.",
             "O Windows nao informou S.M.A.R.T. deste disco (comum em discos USB e controladoras RAID).", "Windows did not report S.M.A.R.T. for this disk (common on USB disks and RAID controllers).",
             "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "The installer was closed, but PawnIO was not detected. Try again.",
@@ -881,7 +885,7 @@ namespace BunosTunner
             "Pastas e arquivos irao para a Lixeira.\n", "Folders and files will go to the Recycle Bin.\n",
             "Pastas e arquivos serao APAGADOS de vez.\n", "Folders and files will be DELETED permanently.\n",
             "Pausar", "Pause",
-            "PawnIO instalado! Feche e abra o Buno's Tunner para os sensores, ventoinhas e timings passarem a usar o driver.", "PawnIO installed! Close and reopen Buno's Tunner so sensors, fans and timings start using the driver.",
+            "PawnIO instalado! Feche e abra o BunoTunner para os sensores, ventoinhas e timings passarem a usar o driver.", "PawnIO installed! Close and reopen BunoTunner so sensors, fans and timings start using the driver.",
             "PawnIO instalado: ", "PawnIO installed: ",
             "PawnIO instalado", "PawnIO installed",
             "PawnIO nao instalado; ", "PawnIO not installed; ",
@@ -991,7 +995,7 @@ namespace BunosTunner
             "Todas", "All",
             "Tudo certo. Em HDDs, observe erros e temperatura (ideal abaixo de 50 C).", "All good. On HDDs, watch errors and temperature (ideally below 50 C).",
             "Tudo certo. SSDs perdem vida conforme a quantidade de dados gravados; valores abaixo de 30% pedem atencao.", "All good. SSDs lose life according to the amount of data written; values below 30% need attention.",
-            "Uma copia das chaves do registro sera salva em BunosTunner_backup.", "A copy of the registry keys will be saved in BunosTunner_backup.",
+            "Uma copia das chaves do registro sera salva em BunoTunner_backup.", "A copy of the registry keys will be saved in BunoTunner_backup.",
             "Usando ", "Using ",
             "Use isto para programas que nao aparecem na lista (portateis, restos de algo ja removido, etc.).\n\nO que voce quer escolher?", "Use this for programs that do not appear in the list (portable ones, leftovers of something already removed, etc.).\n\nWhat do you want to choose?",
             "Uso (%)", "Usage (%)",
@@ -1024,7 +1028,7 @@ namespace BunosTunner
             "\" passar de (", "\" goes above (",
             "\" salvo.", "\" saved.",
             "\" selecionada(s).", "\" selected.",
-            "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o Buno's Tunner procura o que sobrou para voce revisar.", "\"?\n\n1) The official uninstaller will open (follow its screens).\n2) Then Buno's Tunner looks for what was left behind for you to review.",
+            "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o BunoTunner procura o que sobrou para voce revisar.", "\"?\n\n1) The official uninstaller will open (follow its screens).\n2) Then BunoTunner looks for what was left behind for you to review.",
             "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "\"\n\nThis does NOT use the uninstaller: it ends the program's processes, stops its services and lists everything that belongs to it (folder, registry, startup, tasks) for you to delete.\n\nNothing is deleted before you review and confirm the list. Continue?",
             "\n(copiado para a area de transferencia)", "\n(copied to the clipboard)",
             "\n(tempo esgotado)", "\n(timed out)",
@@ -1407,7 +1411,7 @@ namespace BunosTunner
             }
             catch (Exception ex)
             {
-                Dlg.Show(ex.ToString(), "Buno's Tunner - erro fatal");
+                Dlg.Show(ex.ToString(), "BunoTunner - erro fatal");
             }
         }
 
@@ -1731,7 +1735,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.18.4";
+        public const string Version = "v1.19.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -4954,17 +4958,19 @@ namespace BunosTunner
     }
 
     // ------------------------------------------------------------------
-    //  Configuracoes salvas ao lado do .exe (BunosTunner.ini) - portable
+    //  Configuracoes salvas ao lado do .exe (BunoTunner.ini) - portable
     // ------------------------------------------------------------------
     static class Settings
     {
         static Dictionary<string, string> d;
-        static string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunosTunner.ini");
+        static string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunoTunner.ini");
         static void Load()
         {
             d = new Dictionary<string, string>();
             try
             {
+                string old = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunosTunner.ini");
+                if (!File.Exists(path) && File.Exists(old)) File.Copy(old, path);   // migra as configuracoes do nome antigo
                 if (File.Exists(path))
                     foreach (string line in File.ReadAllLines(path, Encoding.UTF8))
                     {
@@ -5322,7 +5328,7 @@ namespace BunosTunner
                 "- Grafico: passe o mouse para ver os valores; \"Normalizar escala\" coloca unidades diferentes lado a lado.\n" +
                 "- \"Atualizar a cada\" muda a velocidade das leituras (em milissegundos).\n" +
                 "- Exportar salva os valores/historico em CSV ou o grafico em PNG.",
-                "Buno's Tunner - Sensores", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                "BunoTunner - Sensores", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         void DriverHelp()
@@ -6285,7 +6291,7 @@ namespace BunosTunner
         public BenchCanvas Cv; public GlCanvas Gl;
         public RenderForm(int kind, int threads)
         {
-            Text = "Buno's Tunner - Render do teste (Esc fecha e para)";
+            Text = "BunoTunner - Render do teste (Esc fecha e para)";
             Size = new Size(700, 560);
             Cv = new BenchCanvas(kind, threads);
             if (kind == 0)
@@ -6342,8 +6348,8 @@ namespace BunosTunner
         // Baixa e executa o instalador oficial (pede permissao de administrador). Chamado pelo botao do menu Ventoinhas.
         public static void InstallNow(Control owner)
         {
-            if (Installed()) { Dlg.Show(owner, "O PawnIO ja esta instalado.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (Dlg.Show(owner, "Baixar e instalar o PawnIO agora?\n\nO instalador oficial (github.com/namazso/PawnIO.Setup) sera baixado e pedira permissao de administrador.", "Buno's Tunner - PawnIO", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (Installed()) { Dlg.Show(owner, "O PawnIO ja esta instalado.", "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (Dlg.Show(owner, "Baixar e instalar o PawnIO agora?\n\nO instalador oficial (github.com/namazso/PawnIO.Setup) sera baixado e pedira permissao de administrador.", "BunoTunner - PawnIO", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             string exe = Path.Combine(Path.GetTempPath(), "PawnIO_setup.exe");
             owner.Enabled = false;
             Th.ThreadPool.QueueUserWorkItem(delegate
@@ -6365,10 +6371,10 @@ namespace BunosTunner
                         owner.Enabled = true;
                         if (err != null)
                         {
-                            if (Dlg.Show(owner, "Nao foi possivel instalar automaticamente (" + err + ").\nAbrir o download no navegador?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                            if (Dlg.Show(owner, "Nao foi possivel instalar automaticamente (" + err + ").\nAbrir o download no navegador?", "BunoTunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                                 try { Process.Start("https://github.com/namazso/PawnIO.Setup/releases/latest/download/PawnIO_setup.exe"); } catch (Exception) { }
                         }
-                        else if (done) Dlg.Show(owner, Installed() ? "PawnIO instalado! Feche e abra o Buno's Tunner para os sensores, ventoinhas e timings passarem a usar o driver." : "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else if (done) Dlg.Show(owner, Installed() ? "PawnIO instalado! Feche e abra o BunoTunner para os sensores, ventoinhas e timings passarem a usar o driver." : "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }));
                 }
                 catch (Exception) { }
@@ -6382,10 +6388,10 @@ namespace BunosTunner
             DialogResult r = Dlg.Show(owner,
                 "Recomendamos a instalacao do PawnIO.\n\n" +
                 "Por que?\n" +
-                "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo Buno's Tunner) precisa para acessar o hardware. " +
+                "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo BunoTunner) precisa para acessar o hardware. " +
                 "Sem ele ficam sem leitura: varios sensores de temperatura da CPU e da placa-mae, o controle das ventoinhas ligadas a placa-mae e os timings da memoria RAM.\n\n" +
                 "Deseja abrir o download oficial agora?\n(Sim = baixa o PawnIO_setup.exe; Nao = continuar sem ele. Este aviso aparece a cada abertura enquanto ele nao estiver instalado.)",
-                "Buno's Tunner - PawnIO recomendado", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
+                "BunoTunner - PawnIO recomendado", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
             if (r != DialogResult.Yes) return;
             try
             {
@@ -6397,7 +6403,7 @@ namespace BunosTunner
             {
                 try { Process.Start("https://pawnio.eu"); } catch (Exception) { }
             }
-            Dlg.Show(owner, "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o Buno's Tunner novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Dlg.Show(owner, "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o BunoTunner novamente.", "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 
@@ -7289,10 +7295,10 @@ namespace BunosTunner
         public static void Open(string name, bool gpu, IWin32Window owner)
         {
             string q = Query(name, gpu);
-            if (q.Length == 0) { Dlg.Show(owner, "Nome do hardware nao identificado.", "Buno's Tunner"); return; }
+            if (q.Length == 0) { Dlg.Show(owner, "Nome do hardware nao identificado.", "BunoTunner"); return; }
             string url = "https://www.techpowerup.com/" + (gpu ? "gpu-specs/" : "cpu-specs/") + "?q=" + Uri.EscapeDataString(q);
             try { ProcessStartInfo psi = new ProcessStartInfo(url); psi.UseShellExecute = true; Process.Start(psi); }
-            catch (Exception ex) { Dlg.Show(owner, "Nao foi possivel abrir o navegador: " + ex.Message, "Buno's Tunner"); }
+            catch (Exception ex) { Dlg.Show(owner, "Nao foi possivel abrir o navegador: " + ex.Message, "BunoTunner"); }
         }
     }
 
@@ -7475,7 +7481,7 @@ namespace BunosTunner
         // ---------- SSD (E/S sem cache do Windows, com verificacao) ----------
         static void SsdRun(string drive, int mb)
         {
-            string path = Path.Combine(drive, "BunosTunner_bench.tmp");
+            string path = Path.Combine(drive, "BunoTunner_bench.tmp");
             try
             {
                 DriveInfo di = new DriveInfo(drive.Substring(0, 1));
@@ -8680,7 +8686,7 @@ namespace BunosTunner
                 {
                     string d;
                     try { d = MemRead.Diagnose(); } catch (Exception ex) { d = ex.ToString(); }
-                    try { BeginInvoke(new Action(delegate { try { Clipboard.SetText(d); } catch (Exception) { } Dlg.Show(this, d + "\n(copiado para a area de transferencia)", "Buno's Tunner - diagnostico dos timings"); })); } catch (Exception) { }
+                    try { BeginInvoke(new Action(delegate { try { Clipboard.SetText(d); } catch (Exception) { } Dlg.Show(this, d + "\n(copiado para a area de transferencia)", "BunoTunner - diagnostico dos timings"); })); } catch (Exception) { }
                 });
             });
             Controls.Add(g);
@@ -9417,7 +9423,7 @@ namespace BunosTunner
             string nm = Directory.Exists(path) ? new DirectoryInfo(path).Name : Path.GetFileNameWithoutExtension(path);
             try { if (File.Exists(path)) { FileVersionInfo vi = FileVersionInfo.GetVersionInfo(path); if (!string.IsNullOrEmpty(vi.ProductName)) nm = vi.ProductName.Trim(); if (!string.IsNullOrEmpty(vi.CompanyName)) p.Publisher = vi.CompanyName.Trim(); } } catch (Exception) { }
             p.Name = nm; p.Loc = folder.TrimEnd('\\'); p.Version = "(manual)";
-            if (!SafeFolder(p.Loc)) { Dlg.Show("Essa pasta e protegida pelo sistema e nao pode ser usada aqui:\n" + p.Loc, "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (!SafeFolder(p.Loc)) { Dlg.Show("Essa pasta e protegida pelo sistema e nao pode ser usada aqui:\n" + p.Loc, "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             progs.Insert(0, p);
             sortCol = -1; txFind.Box.Text = ""; FillProgs();
             if (lvP.Items.Count > 0) { sel = null; foreach (ListViewItem it in lvP.Items) if (it.Tag == p) { it.Selected = true; it.EnsureVisible(); break; } }
@@ -9430,7 +9436,7 @@ namespace BunosTunner
             int res = 0;
             using (Form f = new Form())
             {
-                f.Text = "Buno's Tunner - Adicionar manualmente"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.StartPosition = FormStartPosition.CenterParent;
+                f.Text = "BunoTunner - Adicionar manualmente"; f.FormBorderStyle = FormBorderStyle.FixedDialog; f.StartPosition = FormStartPosition.CenterParent;
                 f.MaximizeBox = false; f.MinimizeBox = false; f.ShowInTaskbar = false; f.ClientSize = new Size(380, 120); f.BackColor = Xp.Face; f.Font = Xp.Ui;
                 Label l = new Label(); l.Text = "Use isto para programas que nao aparecem na lista (portateis, restos de algo ja removido, etc.).\n\nO que voce quer escolher?";
                 l.SetBounds(14, 12, 352, 56); l.ForeColor = Xp.Text; f.Controls.Add(l);
@@ -9514,7 +9520,7 @@ namespace BunosTunner
             if (!force)
             {
                 if (p.Uninst.Length == 0) { Msg("Este item nao tem desinstalador. Use 'Remocao forcada'."); return; }
-                if (Dlg.Show("Desinstalar \"" + p.Name + "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o Buno's Tunner procura o que sobrou para voce revisar.", "Buno's Tunner - Desinstalar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                if (Dlg.Show("Desinstalar \"" + p.Name + "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o BunoTunner procura o que sobrou para voce revisar.", "BunoTunner - Desinstalar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
                 if (chkRestore.Checked) MakeRestorePoint(p.Name);
                 Busy(true, "Desinstalador aberto: conclua as telas dele... (a busca de restos comeca quando ele terminar)");
                 string cmd = p.Uninst;
@@ -9534,7 +9540,7 @@ namespace BunosTunner
             }
             else
             {
-                if (Dlg.Show("REMOCAO FORCADA de \"" + p.Name + "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "Buno's Tunner - Remocao forcada", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+                if (Dlg.Show("REMOCAO FORCADA de \"" + p.Name + "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "BunoTunner - Remocao forcada", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
                 if (chkRestore.Checked) MakeRestorePoint(p.Name);
                 int k = KillProcs(p);
                 StartScan(p, k > 0 ? k + " processo(s) encerrado(s). Procurando restos..." : "Procurando restos...");
@@ -9544,7 +9550,7 @@ namespace BunosTunner
         {
             if (sel == null) return;
             if (string.IsNullOrEmpty(sel.Loc) || !SafeFolder(sel.Loc)) { Msg("Nao sei qual e a pasta deste programa; use 'Escolher pasta ou .exe' para informar."); return; }
-            if (Dlg.Show("Finalizar todos os processos de \"" + sel.Name + "\" (pasta " + sel.Loc + ")?\nTrabalho nao salvo nele sera perdido.", "Buno's Tunner", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (Dlg.Show("Finalizar todos os processos de \"" + sel.Name + "\" (pasta " + sel.Loc + ")?\nTrabalho nao salvo nele sera perdido.", "BunoTunner", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             int n = KillProcs(sel);
             Msg(n > 0 ? n + " processo(s) finalizado(s)." : "Nenhum processo desse programa esta aberto.");
         }
@@ -9817,14 +9823,14 @@ namespace BunosTunner
             foreach (ListViewItem it in lvL.CheckedItems) items.Add((ULeft)it.Tag);
             if (items.Count == 0) { Msg("Nenhum item marcado."); return; }
             bool bin = chkBin.Checked, bak = chkReg.Checked;
-            if (Dlg.Show("Remover " + items.Count + " item(ns) marcado(s)?\n\n" + (bin ? "Pastas e arquivos irao para a Lixeira.\n" : "Pastas e arquivos serao APAGADOS de vez.\n") + (bak ? "Uma copia das chaves do registro sera salva em BunosTunner_backup." : "Sem copia do registro."), "Buno's Tunner - Remover", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (Dlg.Show("Remover " + items.Count + " item(ns) marcado(s)?\n\n" + (bin ? "Pastas e arquivos irao para a Lixeira.\n" : "Pastas e arquivos serao APAGADOS de vez.\n") + (bak ? "Uma copia das chaves do registro sera salva em BunoTunner_backup." : "Sem copia do registro."), "BunoTunner - Remover", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             Busy(true, "Removendo...");
             UProg kp = lastProg;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
                 int ok = 0; rebootN = 0; List<string> fails = new List<string>();
                 if (kp != null) KillProcs(kp);
-                string bdir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunosTunner_backup\\" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+                string bdir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunoTunner_backup\\" + DateTime.Now.ToString("yyyyMMdd_HHmmss"));
                 int regN = 0;
                 foreach (ULeft l in items)
                 {
@@ -9839,9 +9845,9 @@ namespace BunosTunner
                 {
                     BeginInvoke(new Action(delegate
                     {
-                        Busy(false, ok + " item(ns) removido(s)" + (fails.Count > 0 ? ", " + fails.Count + " com falha." : ".") + (rebootN > 0 ? " " + rebootN + " arquivo(s) em uso serao apagados no proximo reinicio do Windows." : "") + (bak && regN > 0 ? " Copias do registro em BunosTunner_backup." : ""));
+                        Busy(false, ok + " item(ns) removido(s)" + (fails.Count > 0 ? ", " + fails.Count + " com falha." : ".") + (rebootN > 0 ? " " + rebootN + " arquivo(s) em uso serao apagados no proximo reinicio do Windows." : "") + (bak && regN > 0 ? " Copias do registro em BunoTunner_backup." : ""));
                         if (fails.Count > 0)
-                            Dlg.Show("Nao foi possivel remover:\n\n" + string.Join("\n", fails.GetRange(0, Math.Min(12, fails.Count)).ToArray()) + "\n\nSe o arquivo esta em uso, feche o programa (ou use 'Remocao forcada') e tente de novo; ou reinicie o PC.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            Dlg.Show("Nao foi possivel remover:\n\n" + string.Join("\n", fails.GetRange(0, Math.Min(12, fails.Count)).ToArray()) + "\n\nSe o arquivo esta em uso, feche o programa (ou use 'Remocao forcada') e tente de novo; ou reinicie o PC.", "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         LoadProgs();
                         lvL.Items.Clear();
                     }));
@@ -10199,7 +10205,7 @@ namespace BunosTunner
         // ---------- informacoes (so ao clicar) ----------
         void ShowInfo()
         {
-            if (Dlg.Show("ATENCAO: as informacoes a seguir sao PESSOAIS.\n\nVao aparecer seu IP interno e externo, enderecos MAC, provedor, cidade aproximada, nome da rede Wi-Fi e DNS.\nNao compartilhe prints desta tela.\n\nMostrar mesmo assim?", "Buno's Tunner - Dados pessoais", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (Dlg.Show("ATENCAO: as informacoes a seguir sao PESSOAIS.\n\nVao aparecer seu IP interno e externo, enderecos MAC, provedor, cidade aproximada, nome da rede Wi-Fi e DNS.\nNao compartilhe prints desta tela.\n\nMostrar mesmo assim?", "BunoTunner - Dados pessoais", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             bInfo.Enabled = false; lblHint.Text = "Coletando informacoes..."; lblHint.Visible = true; tbInfo.Visible = false;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
@@ -10218,7 +10224,7 @@ namespace BunosTunner
         {
             ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
             HttpWebRequest rq = (HttpWebRequest)WebRequest.Create(url);
-            rq.Timeout = 8000; rq.UserAgent = "BunosTunner";
+            rq.Timeout = 8000; rq.UserAgent = "BunoTunner";
             using (WebResponse rs = rq.GetResponse())
             using (StreamReader sr = new StreamReader(rs.GetResponseStream())) return sr.ReadToEnd();
         }
@@ -10584,7 +10590,7 @@ namespace BunosTunner
                     try { BeginInvoke(new Action(delegate { st.Text = r; b1.Enabled = true; if (b2 != null) b2.Enabled = true; })); } catch (Exception) { }
                 });
             };
-            b1.Click += delegate { if (confirm != null && Dlg.Show(confirm, "Buno's Tunner - Otimizacoes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return; go(run); };
+            b1.Click += delegate { if (confirm != null && Dlg.Show(confirm, "BunoTunner - Otimizacoes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return; go(run); };
             if (b2 != null) b2.Click += delegate { go(undo); };
             box.Controls.Add(g);
         }
@@ -10709,7 +10715,7 @@ namespace BunosTunner
 
         public MainForm()
         {
-            Text = "Buno's Tunner";
+            Text = "BunoTunner";
             Size = new Size(772, 706);
 
             Startup.Mark("MainForm: inicio");
@@ -10733,8 +10739,8 @@ namespace BunosTunner
             bar.Resize += place; place(null, EventArgs.Empty);
             bPay.Click += delegate { Donate(PayPalUrl, "PayPal"); };
             bLive.Click += delegate { Donate(LivePixUrl, "LivePix"); };
-            tip.SetToolTip(bPay, "Apoie o Buno's Tunner via PayPal");
-            tip.SetToolTip(bLive, "Apoie o Buno's Tunner via LivePix");
+            tip.SetToolTip(bPay, "Apoie o BunoTunner via PayPal");
+            tip.SetToolTip(bLive, "Apoie o BunoTunner via LivePix");
 
             Controls.Add(right);
             Controls.Add(left);
@@ -10815,13 +10821,14 @@ namespace BunosTunner
             if (cmb.Items.Count > 0) cmb.SelectedIndex = 0;
             else
             {
-                Dlg.Show("Nenhuma placa de video foi detectada.\nRode como administrador e confira a pasta libs.", "Buno's Tunner");
+                Dlg.Show("Nenhuma placa de video foi detectada.\nRode como administrador e confira a pasta libs.", "BunoTunner");
             }
 
             timer.Interval = 1000;
             timer.Tick += delegate { try { Tick(); } catch (Exception) { } };
             timer.Start();
             FormClosing += OnClosing;
+            InitTray();
         }
 
         XpIconButton IconBtn(Control parent, string kind, int x, int y, string tipText, EventHandler h)
@@ -10836,8 +10843,8 @@ namespace BunosTunner
 
         void Donate(string url, string nome)
         {
-            if (string.IsNullOrEmpty(url)) { Dlg.Show("O link do " + nome + " ainda nao foi configurado.\nEm breve!", "Buno's Tunner"); return; }
-            try { Process.Start(url); } catch (Exception ex) { Dlg.Show(ex.Message, "Buno's Tunner"); }
+            if (string.IsNullOrEmpty(url)) { Dlg.Show("O link do " + nome + " ainda nao foi configurado.\nEm breve!", "BunoTunner"); return; }
+            try { Process.Start(url); } catch (Exception ex) { Dlg.Show(ex.Message, "BunoTunner"); }
         }
 
         void ShowPage(Panel p)
@@ -10858,7 +10865,7 @@ namespace BunosTunner
             {
                 List<Sn> all = new List<Sn>();
                 all.AddRange(SensorHub.GpuSensors); all.AddRange(SensorHub.PcSensors);
-                sensForm = new SensorForm("Buno's Tunner - Sensores (GPU, CPU, placa-mae, memoria, discos, ventoinhas...)", all);
+                sensForm = new SensorForm("BunoTunner - Sensores (GPU, CPU, placa-mae, memoria, discos, ventoinhas...)", all);
                 sensForm.Show();
             }
             else { if (sensForm.WindowState == FormWindowState.Minimized) sensForm.WindowState = FormWindowState.Normal; sensForm.BringToFront(); }
@@ -11035,7 +11042,7 @@ namespace BunosTunner
             look.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             g.Controls.Add(look);
             g.Resize += delegate { copy.Top = g.Height - 32; look.Top = copy.Top; };
-            look.Click += delegate { if (cur == null) { Dlg.Show(this, "Nenhuma GPU selecionada.", "Buno's Tunner"); return; } Tpu.Open(cur.Name, true, this); };
+            look.Click += delegate { if (cur == null) { Dlg.Show(this, "Nenhuma GPU selecionada.", "BunoTunner"); return; } Tpu.Open(cur.Name, true, this); };
             copy.Click += delegate
             {
                 StringBuilder sb = new StringBuilder();
@@ -11290,7 +11297,7 @@ namespace BunosTunner
             if (kind == 4)
             {
                 if (drive == null) { lblBMsg.Text = "Nenhum drive disponivel para o teste de SSD."; return; }
-                if (bDurSec == 0 && Dlg.Show("Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                if (bDurSec == 0 && Dlg.Show("Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "BunoTunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             }
             BenchSave(kind); bGlChecked = false;
             string gname = cur != null ? cur.Name : null;
@@ -11394,7 +11401,7 @@ namespace BunosTunner
             long errs = Th.Interlocked.Read(ref Bench.Errors);
             if (rf != null && !rf.IsDisposed)
             {
-                rf.Text = "Buno's Tunner - " + BName[bKind] + ": " + rate.ToString("0.0") + " " + bU + " (Esc fecha e para)"; rf.Invalidate(new Rectangle(0, 0, rf.Width, 32));
+                rf.Text = "BunoTunner - " + BName[bKind] + ": " + rate.ToString("0.0") + " " + bU + " (Esc fecha e para)"; rf.Invalidate(new Rectangle(0, 0, rf.Width, 32));
                 rf.Cv.Rate = rate; rf.Cv.Temp = t.HasValue ? t.Value : double.NaN; rf.Cv.Elapsed = elapsed; rf.Cv.Errors = errs; rf.Cv.Extra = Bench.Extra;
             }
             lblBRate.Text = rate.ToString("0.0") + " " + u;
@@ -11592,8 +11599,50 @@ namespace BunosTunner
             }
         }
 
+        // ---------------- bandeja do sistema ----------------
+        NotifyIcon tray; bool reallyExit, trayTold;
+        void InitTray()
+        {
+            try
+            {
+                tray = new NotifyIcon();
+                tray.Icon = Icon; tray.Text = "BunoTunner";
+                ContextMenuStrip cm = new ContextMenuStrip();
+                cm.Items.Add("Abrir BunoTunner", null, delegate { ShowFromTray(); });
+                ToolStripMenuItem mi = new ToolStripMenuItem("Minimizar para a bandeja ao clicar no X");
+                mi.CheckOnClick = true; mi.Checked = Settings.Get("tray", "1") == "1";
+                mi.CheckedChanged += delegate { Settings.Set("tray", mi.Checked ? "1" : "0"); };
+                cm.Items.Add(mi);
+                cm.Items.Add(new ToolStripSeparator());
+                cm.Items.Add("Sair", null, delegate { reallyExit = true; Close(); });
+                Lang.Menu(cm);
+                tray.ContextMenuStrip = cm;
+                tray.DoubleClick += delegate { ShowFromTray(); };
+                tray.Visible = true;
+            }
+            catch (Exception) { tray = null; }
+        }
+        void ShowFromTray()
+        {
+            Show();
+            if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+            Activate();
+        }
+
         void OnClosing(object s, FormClosingEventArgs e)
         {
+            if (!reallyExit && tray != null && e.CloseReason == CloseReason.UserClosing && Settings.Get("tray", "1") == "1")
+            {
+                e.Cancel = true;
+                Hide();
+                if (!trayTold)
+                {
+                    trayTold = true;
+                    try { tray.ShowBalloonTip(2500, "BunoTunner", Lang.T("Continua rodando na bandeja. Clique duas vezes no icone para abrir."), ToolTipIcon.Info); } catch (Exception) { }
+                }
+                return;
+            }
+            if (tray != null) { try { tray.Visible = false; tray.Dispose(); } catch (Exception) { } tray = null; }
             Bench.Stop = true;
             timer.Stop();
             try { fanPage.RestoreAll(); affPage.Shutdown(); } catch (Exception) { }
