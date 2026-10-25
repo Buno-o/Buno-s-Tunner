@@ -1324,8 +1324,8 @@ namespace BunosTunner
         public static void Reapply()
         {
             cache.Clear();
-            Form[] fs = new Form[Application.OpenForms.Count];
-            Application.OpenForms.CopyTo(fs, 0);
+            List<Form> fs = new List<Form>();
+            foreach (Form f0 in Application.OpenForms) fs.Add(f0);
             foreach (Form f in fs) { Apply(f, null); Sweep(f, true); }
             foreach (LTip t in Tips) t.Retranslate();
             for (int i = menus.Count - 1; i >= 0; i--)
@@ -1345,8 +1345,8 @@ namespace BunosTunner
             sweeper.Tick += delegate
             {
                 if (Cur == 0) return;
-                Form[] fs = new Form[Application.OpenForms.Count];
-                Application.OpenForms.CopyTo(fs, 0);
+                List<Form> fs = new List<Form>();
+                foreach (Form f0 in Application.OpenForms) fs.Add(f0);
                 foreach (Form f in fs) Sweep(f, false);
             };
             sweeper.Start();
