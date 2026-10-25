@@ -104,7 +104,7 @@ namespace BunosTunner
             using (Font f = new Font(Xp.Ui.FontFamily, 15f, FontStyle.Bold))
                 TextRenderer.DrawText(g, "Buno's Tunner", f, new Point(18, 14), Xp.Text);
             TextRenderer.DrawText(g, Lang.T("Carregando sensores e hardware..."), Xp.Ui, new Point(20, 50), Xp.Text);
-            string st = Startup.Status ?? "";
+            string st = Lang.T(Startup.Status ?? "");
             if (st.Length > 52) st = st.Substring(0, 52);
             TextRenderer.DrawText(g, st, Xp.Ui, new Point(20, 68), Xp.Dim);
             int x0 = 20, w = Width - 40, bw = 70, pos = (tick * 9) % (w + bw) - bw;
@@ -1102,6 +1102,23 @@ namespace BunosTunner
             "sim", "yes",
             "nao", "no",
             "Sim", "Yes",
+            "Grupo;Sensor;Tipo;Valor;Minimo;Maximo;Unidade", "Group;Sensor;Type;Value;Minimum;Maximum;Unit",
+            "IGCL incompleta", "IGCL incomplete",
+            "IGCL sem Overclock", "IGCL without Overclock",
+            "Sistema operacional", "Operating system",
+            "Driver (registro)", "Driver (registry)",
+            "pasta de instalacao", "installation folder",
+            "pasta protegida", "protected folder",
+            "Temp max", "Max temp",
+            "NVML iniciado", "NVML started",
+            "Rede", "Network",
+            "Placa de video", "Graphics card",
+            " MB em ", " MB in ",
+            "LHM configurado", "LHM configured",
+            "MainForm: inicio", "MainForm: start",
+            "MainForm: paginas criadas", "MainForm: pages created",
+            "SensorHub.Open concluido", "SensorHub.Open done",
+            "tema e PawnIO verificados", "theme and PawnIO checked",
             "ns x tamanho do bloco", "ns x block size" };
 
         static Lang()
@@ -1129,21 +1146,22 @@ namespace BunosTunner
             if (v == "pt") Cur = 0;
             else if (v == "en") Cur = 1;
             else Cur = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLower() == "pt" ? 0 : 1;
-            cache.Clear();
+            lock (cache) cache.Clear();
         }
 
         static bool IsW(char c) { return char.IsLetterOrDigit(c); }
 
         // traduz um texto qualquer (inteiro ou so trechos conhecidos dele); em portugues devolve o proprio texto
+        public static string Pick(string pt, string en_) { return Cur == 1 ? en_ : pt; }
+
         public static string T(string pt)
         {
             if (Cur == 0 || string.IsNullOrEmpty(pt)) return pt;
             string r;
             if (en.TryGetValue(pt, out r)) return r;
-            if (cache.TryGetValue(pt, out r)) return r;
+            lock (cache) { if (cache.TryGetValue(pt, out r)) return r; }
             r = Frag(pt);
-            if (cache.Count > 6000) cache.Clear();
-            cache[pt] = r;
+            lock (cache) { if (cache.Count > 6000) cache.Clear(); cache[pt] = r; }
             return r;
         }
 
@@ -1244,6 +1262,7 @@ namespace BunosTunner
             if (cb != null && cb.DropDownStyle == ComboBoxStyle.DropDownList && !(cb.Tag is string && (string)cb.Tag == "nolang") && cb.DrawMode == DrawMode.Normal)
             {
                 cb.DrawMode = DrawMode.OwnerDrawFixed;
+                cb.ItemHeight = cb.Font.Height + 2;
                 cb.DrawItem += DrawCombo;
             }
             if (c.ContextMenuStrip != null) Menu(c.ContextMenuStrip);
@@ -1323,7 +1342,7 @@ namespace BunosTunner
         // troca de idioma ao vivo
         public static void Reapply()
         {
-            cache.Clear();
+            lock (cache) cache.Clear();
             List<Form> fs = new List<Form>();
             foreach (Form f0 in Application.OpenForms) fs.Add(f0);
             foreach (Form f in fs) { Apply(f, null); Sweep(f, true); }
@@ -4346,7 +4365,7 @@ namespace BunosTunner
                 uint pmn, pmx;
                 if (pl.HasValue) add("Limite de potencia atual", (pl.Value / 1000f).ToString("0") + " W");
                 if (pd.HasValue) add("Limite de potencia padrao", (pd.Value / 1000f).ToString("0") + " W");
-                if (Nvml.PowerRange(H, out pmn, out pmx)) add("Faixa de potencia permitida", (pmn / 1000f).ToString("0") + " a " + (pmx / 1000f).ToString("0") + " W");
+                if (Nvml.PowerRange(H, out pmn, out pmx)) add("Faixa de potencia permitida", (pmn / 1000f).ToString("0") + Lang.Pick(" a ", " to ") + (pmx / 1000f).ToString("0") + " W");
                 add("Temp. de desligamento", Fm(Nvml.TempThr(H, 0), " \u00B0C"));
                 add("Temp. de slowdown (throttle)", Fm(Nvml.TempThr(H, 1), " \u00B0C"));
                 add("Temp. maxima da GPU", Fm(Nvml.TempThr(H, 2), " \u00B0C"));
@@ -4354,7 +4373,7 @@ namespace BunosTunner
                 add("Temp. alvo (limite de temperatura)", Fm(Nvml.TempThr(H, 5), " \u00B0C"));
                 add("Quantidade de ventoinhas", FanCount().ToString());
                 uint fmn, fmx;
-                if (Nvml.MinMaxFan(H, out fmn, out fmx)) add("Faixa da ventoinha (driver)", fmn + "% a " + fmx + "%");
+                if (Nvml.MinMaxFan(H, out fmn, out fmx)) add("Faixa da ventoinha (driver)", fmn + Lang.Pick("% a ", "% to ") + fmx + "%");
                 int? ps = Nvml.Pstate(H);
                 if (ps.HasValue) add("Estado de desempenho", "P" + ps.Value);
             }
@@ -4381,7 +4400,7 @@ namespace BunosTunner
                     Oc.Refresh();
                     Action<string, OcCap> cap = delegate(string k, OcCap c)
                     {
-                        if (c.Ok) add(k, "Ligado - faixa " + c.Min + " a " + c.Max + " " + c.Unit);
+                        if (c.Ok) add(k, "Ligado - faixa " + c.Min + Lang.Pick(" a ", " to ") + c.Max + " " + c.Unit);
                         else add(k, "Indisponivel (" + c.Why + ")");
                     };
                     cap("Offset do clock do nucleo", Oc.Core); cap("Offset do clock da memoria", Oc.Mem);
@@ -5412,7 +5431,7 @@ namespace BunosTunner
         {
             int alerts = 0;
             foreach (Sn s in list) if (s.AlertAbove.HasValue) alerts++;
-            lblInfo.Text = shown + " de " + list.Count + " sensores  |  " + ser.Count + " no grafico  |  " + alerts + " alerta(s)";
+            lblInfo.Text = shown + Lang.Pick(" de ", " of ") + list.Count + " sensores  |  " + ser.Count + " no grafico  |  " + alerts + " alerta(s)";
         }
 
         static void SetSub(ListViewItem it, int i, string t) { t = Lang.T(t); if (it.SubItems[i].Text != t) it.SubItems[i].Text = t; }
@@ -5535,7 +5554,7 @@ namespace BunosTunner
             try
             {
                 StringBuilder sb = new StringBuilder();
-                sb.AppendLine("Grupo;Sensor;Tipo;Valor;Minimo;Maximo;Unidade");
+                sb.AppendLine(Lang.T("Grupo;Sensor;Tipo;Valor;Minimo;Maximo;Unidade"));
                 foreach (Sn s in list)
                     if (s.Seen)
                         sb.AppendLine(Csv(s.Group) + ";" + Csv(s.Name) + ";" + s.Category + ";" + (s.Last.HasValue ? s.Last.Value.ToString("0.##") : "") + ";" +
@@ -7560,7 +7579,7 @@ namespace BunosTunner
                     last = m;
                 }
             }
-            Msg(ok + " de " + sel.Count + " ventoinha(s) aplicada(s). " + last, ok == 0);
+            Msg(ok + Lang.Pick(" de ", " of ") + sel.Count + " ventoinha(s) aplicada(s). " + last, ok == 0);
         }
 
         void ByRpm()
@@ -7627,7 +7646,7 @@ namespace BunosTunner
                 float? t = TempOf(c);
                 if (safeOn && t.HasValue && t.Value >= safeT)
                 {
-                    if (!c.Boost) { c.Boost = true; string m1; c.Set(100, out m1); Msg("SEGURANCA: " + c.Display + " a 100% (" + t.Value.ToString("0") + " \u00B0C).", true); }
+                    if (!c.Boost) { c.Boost = true; string m1; c.Set(100, out m1); Msg("SEGURANCA: " + c.Display + Lang.Pick(" a 100% (", " at 100% (") + t.Value.ToString("0") + " \u00B0C).", true); }
                     continue;
                 }
                 if (c.Boost) { if (t.HasValue && t.Value < safeT - 5) { c.Boost = false; c.Last = -1; } else continue; }
@@ -8546,7 +8565,7 @@ namespace BunosTunner
             long m = 0; for (int i = off; i < N; i += 2) m |= 1L << i;
             return m;
         }
-        void UpdateCount() { int c = 0; for (int i = 0; i < N; i++) if (cpuBox[i].Checked) c++; lblCount.Text = c + " de " + N + " CPUs marcados"; }
+        void UpdateCount() { int c = 0; for (int i = 0; i < N; i++) if (cpuBox[i].Checked) c++; lblCount.Text = c + Lang.Pick(" de ", " of ") + N + " CPUs marcados"; }
 
         string MaskText(long mask)
         {
@@ -10575,7 +10594,7 @@ namespace BunosTunner
                 s.Minimum = c.Min; s.Maximum = c.Max;
                 s.Value = Math.Max(c.Min, Math.Min(c.Max, c.Cur));
                 t.Text = s.Value.ToString();
-                rg.Text = "(" + c.Min + " a " + c.Max + ")";
+                rg.Text = "(" + c.Min + Lang.Pick(" a ", " to ") + c.Max + ")";
             }
             else
             {
