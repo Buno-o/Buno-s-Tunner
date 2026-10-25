@@ -33,6 +33,10 @@ jobs:
           '@ | Set-Content -Path lhm/lhm.csproj -Encoding utf8
           $b = dotnet build lhm/lhm.csproj -c Release -o lhm/out 2>&1
           Write-Host "::notice::OUT=$((Get-ChildItem lhm/out -Recurse | ForEach-Object { $_.Name }) -join ' | ')"
+          $pk = Join-Path $env:USERPROFILE '.nuget/packages/librehardwaremonitorlib/0.9.6/lib'
+          Write-Host "::notice::PKG=$((Get-ChildItem $pk -Recurse | ForEach-Object { $_.FullName.Replace($pk,'') }) -join ' | ')"
+          $lib = Get-ChildItem $pk -Recurse -Filter LibreHardwareMonitorLib.dll | Where-Object { $_.FullName -match 'net472|net48|netstandard' } | Select-Object -First 1
+          if ($lib) { Copy-Item $lib.FullName libs/ -Force }
           Get-ChildItem lhm/out -Filter *.dll | Where-Object { $_.Name -ne 'lhm.dll' } | ForEach-Object { Copy-Item $_.FullName libs/ -Force }
           Write-Host "::notice::LIBS=$((Get-ChildItem libs | ForEach-Object { $_.Name }) -join ' | ')"
           if (-not (Test-Path libs/LibreHardwareMonitorLib.dll)) { Write-Host "::error::LibreHardwareMonitorLib.dll nao foi copiado"; exit 1 }
