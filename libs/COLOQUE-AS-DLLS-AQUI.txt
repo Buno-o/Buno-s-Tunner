@@ -1,0 +1,1 @@
+Copie aqui todas as .dll do LibreHardwareMonitor (veja LEIA-ME.txt).

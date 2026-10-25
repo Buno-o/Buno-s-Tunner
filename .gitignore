@@ -1,0 +1,6 @@
+*.exe
+*.obj
+*.pdb
+libs/*.dll
+BunosTunner_startup.log
+BunosTunner_backup/

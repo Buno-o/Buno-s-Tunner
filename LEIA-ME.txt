@@ -1,0 +1,237 @@
+BUNO'S TUNNER  -  GPU Tweaker (visual Windows XP, portable)
+=============================================================
+
+O QUE E
+  Programa de arquivo unico (BunosTunner.exe), sem instalacao. Controla ventoinhas
+  (% e RPM), faz overclock (NVIDIA), mostra todas as especificacoes e sensores.
+
+COMO GERAR O .EXE (1 vez, ~2 minutos, nao precisa instalar Visual Studio)
+  1) Baixe o LibreHardwareMonitor (GitHub: LibreHardwareMonitor/LibreHardwareMonitor,
+     aba Releases, arquivo .zip). Prefira a versao 0.9.4 (driver embutido, 100% portable);
+     versoes mais novas podem pedir o driver PawnIO para ler placa-mae/CPU.
+  2) Extraia o zip e copie TODAS as arquivos .dll para a pasta "libs" (ao lado do build.bat).
+  3) De dois cliques em build.bat  ->  gera BunosTunner.exe (usa o compilador que ja vem no Windows).
+  4) Execute BunosTunner.exe (ele pede permissao de Administrador; e necessario).
+  O .exe final carrega as DLLs dentro dele: pode copiar so ele para um pendrive.
+
+REQUISITOS
+  Windows 10/11 x64 (.NET Framework 4.x, ja incluso) e driver NVIDIA instalado (para NVML).
+
+LIMITES REAIS (nao e falha do programa)
+  - Ventoinhas NVIDIA: usa NVML; se o driver recusar, tenta o LibreHardwareMonitor.
+  - Voltagem/amperagem: o NVML nao fornece; aparecem so se o LibreHardwareMonitor expuser.
+  - OC (core/mem/TDP/temp limit/travar clock): so NVIDIA nesta versao.
+  - Crossbar/Uncore clock: a NVIDIA nao expoe em API publica; nao e possivel alterar.
+  - Use por sua conta e risco; comece com valores pequenos.
+
+DOACOES (PayPal / LivePix)
+  Os dois icones no canto inferior direito abrem o PayPal e a LivePix. Para trocar os links, edite
+  PayPalUrl e LivePixUrl em BunosTunner.cs (classe MainForm) e rode build.bat de novo.
+
+SOBRE TRAVADAS
+  A leitura dos sensores agora roda em segundo plano (discos so a cada 5 s), a janela nao trava mais.
+  A abertura do programa ainda leva alguns segundos (o LibreHardwareMonitor varre o hardware 1 vez).
+
+SE O OC DE CORE/MEMORIA FALHAR
+  A mensagem na aba Overclock mostra o motivo de cada tentativa (NVML, NVML novo e NvAPI).
+  Me mande essa mensagem que eu ajusto.
+
+VERSAO v1.1.0
+  - A versao aparece no canto inferior esquerdo do painel lateral (Xp.Version em BunosTunner.cs).
+  - Nova pagina "Especificacoes da CPU" (icone abaixo do da GPU). Precisa de System.Management (ja no build.bat).
+  - Memory clock agora e digitado em MHz reais; o programa envia o dobro ao driver (MemFactor = 2).
+
+VERSAO v1.2.0 - SENSORES REPAGINADOS
+  - Cartoes no topo com os valores principais (temperatura fica laranja/vermelha quando esquenta).
+  - Busca por nome, filtro por dispositivo e por tipo, "ocultar sem leitura", "so no grafico".
+  - Clique nos cabecalhos para ordenar. Duplo clique (ou caixinha) liga/desliga o sensor no grafico.
+  - Botao direito: mostrar no grafico, definir ALERTA (som + aviso vermelho na barra de status do app,
+    mesmo com a janela de sensores fechada), copiar nome/valor, zerar min/max.
+  - Grafico: janela de 1 a 30 min, pausar, legenda com valor atual, cursor mostra o valor de cada linha.
+  - Exportar: valores atuais (CSV), historico do grafico (CSV) e imagem (PNG).
+  - O programa lembra seus sensores marcados, janela e alertas no arquivo BunosTunner.ini (ao lado do .exe).
+
+VERSAO v1.3.0
+  TEMAS: seletor "Tema" no canto superior direito (ao lado da escolha da GPU): Luna (Windows XP) ou
+         Frutiger Aero (Windows 7). A escolha fica salva no BunosTunner.ini.
+  ESPECIFICACOES: CPU e GPU agora mostram recursos ligados/desligados (verde/vermelho): Secure Boot, UEFI,
+         TPM, virtualizacao, SLAT, DEP, VBS, integridade de memoria, Hyper-V, Fast Startup, SMT,
+         Resizable BAR, Above 4G Decoding, HAGS, Game Mode, ECC, limitacao de clock e mais.
+         Obs.: ReBAR e Above 4G sao INFERIDOS pelo tamanho do BAR1 (NVML): > 256 MB = ligado.
+  BENCHMARK (icone novo): estresse de GPU (OpenCL), CPU (inteiros), FPU (matrizes), RAM e SSD, com
+         verificacao de erros, grafico ao vivo e parada automatica por temperatura.
+         - GPU usa o OpenCL.dll que ja vem no driver. Cada disparo e mantido curto para nao acionar o TDR.
+         - SSD cria um arquivo temporario (apagado ao fechar) e escreve de verdade: evite "Ate parar".
+  ICONES: ventoinha e GPU redesenhados; novo icone de benchmark (cronometro).
+
+VERSAO v1.4.0
+  SENSORES
+   - Temperatura da CPU "travada em 0": o driver do LibreHardwareMonitor nao conseguia ler a CPU
+     (comum com "Integridade de memoria"/Core Isolation do Windows ou Defender bloqueando o driver).
+     Agora leituras impossiveis (0 C / 0 V) sao descartadas, o programa usa a "zona termica" do Windows
+     como alternativa e a pagina "Especificacoes da CPU" mostra o diagnostico ("Leitura dos sensores da CPU").
+     Para ter os sensores completos: desative Seguranca do dispositivo > Isolamento de nucleo > Integridade
+     de memoria (ou use uma versao do LibreHardwareMonitor compativel com o seu Windows) e reinicie.
+   - Janela de sensores: campo "Atualizar a cada [ms]" (100 a 10000). Vale tambem para a leitura em segundo plano.
+  VENTOINHAS: agora controla TODAS (GPU, placa-mae e coolers que o LibreHardwareMonitor enxergar), varias de uma vez,
+     com modos Automatico/Manual/Curva (por temperatura escolhida), presets, "Identificar" e seguranca por temperatura.
+  OC DA CPU (icone novo): identificacao da CPU, TODAS as voltagens (lidas) com explicacao, multiplicador/BCLK (leitura),
+     plano para o BIOS, limites do Windows (frequencia maxima, boost, estados), PBO/PPT/TDC/EDC/Curve Optimizer
+     (AM4 -30, AM5 -50) aplicados via RyzenAdj SE voce colocar ryzenadj.exe ao lado do programa (ou em tools\).
+     O programa NAO escreve voltagens/multiplicador/BCLK: isso so e seguro e confiavel no BIOS.
+  RAM (icone novo): modulos, velocidade, canais, voltagem, banda e planilha com TODOS os timings (valores anotados por voce;
+     o Windows nao informa timings) com calculos de latencia real, tRFC, tREFI etc. e perfis.
+  AFINIDADE (icone novo): escolha os nucleos de varios processos de uma vez, prioridade, presets e regras automaticas.
+
+VERSAO v1.5.0
+  - Removido o menu "OC da CPU".
+  - SENSORES: agora e UMA janela so (GPU, CPU, placa-mae, memoria, discos, ventoinhas). Categorias a esquerda
+    com contagem, busca (Ctrl+F; Ctrl+A funciona em todos os campos de texto), filtro por tipo, botao "Como usar",
+    8 cartoes principais no topo e aviso clicavel quando o driver nao le a CPU.
+  - TIMINGS DA RAM: o programa tenta LER os timings atuais sozinho:
+      1) Ryzen AM4 (DDR4): le os registradores do controlador de memoria (como o ZenTimings), validando os valores;
+      2) CPU-Z: se o cpuz_x64.exe (portatil) estiver ao lado do programa ou na pasta tools\, ele e executado e o relatorio importado
+         (funciona em Intel, AMD e outras plataformas);
+      3) "Importar arquivo" / "Colar texto": relatorios do CPU-Z, HWiNFO e similares.
+    Valores digitados por voce continuam valendo sobre os lidos.
+  - VENTOINHAS: tipos CPU / Bomba (AIO) / Gabinete / GPU, selecao rapida por tipo, renomear (ex.: "CPU_FAN", "Bomba AIO",
+    "Gabinete frontal"), bombas nunca abaixo de 60%.
+  - TEMA Windows 7 (Frutiger Aero) refeito: vidro com reflexos, botoes de janela colados no topo, cores mais claras.
+  - COMPATIBILIDADE: temperatura da CPU ignora "distancia ate o TjMax"/limites; zonas termicas ACPI como alternativa;
+    GPUs sem suporte do LibreHardwareMonitor/NVML sao listadas via WMI; build.bat gera 32 ou 64 bits conforme o Windows;
+    o LibreHardwareMonitor e configurado por reflexao (aceita versoes diferentes). Requer .NET Framework 4.x (Windows 7 SP1 ou mais novo).
+
+VERSAO v1.6.0
+  - ICONES na ordem do EXEMPLO.png: CPU, GPU, RAM, Ventoinhas, OC da GPU, Benchmark | Afinidade, Sensores.
+  - VENTOINHAS simplificado como no EXEMPLO.png: lista, Identificar, Tudo automatico, modo Automatico/Manual (com RPM alvo),
+    Aplicar e seguranca. Selecionar por tipo (CPU/bombas/gabinete/GPU) e Renomear agora ficam no menu do botao direito da lista.
+  - RAM / TIMINGS: coloque a pasta do ZenTimings (com ZenTimings.exe) ao lado do BunosTunner.exe (ou em tools\).
+    Ao abrir a aba Memoria o programa abre o ZenTimings minimizado, le os valores da janela dele, e fecha.
+    (So AMD Ryzen. Se o ZenTimings nao estiver na pasta, o resumo da memoria continua funcionando normalmente.)
+  - TEMA Windows 7 (Frutiger Aero): moldura de vidro de 8 px com reflexos, brilho na barra de titulo, painel lateral
+    aqua com bolhas, caixas de marcar com destaque azul ao passar o mouse.
+
+VERSAO v1.7.0
+  - O programa SEMPRE abre na aba Especificacoes da CPU.
+  - Corrigido o aviso CS0649 (FanCh.TempSrc).
+  - RAM: removidos o ZenTimings, a tabela de timings, a edicao manual, importar/colar e perfis.
+    Agora ha apenas uma leitura BEM basica, automatica, no estilo CPU-Z/HWiNFO: tCAS, tRCD, tRP, tRAS, tRC, tRFC e Command Rate,
+    lidos direto do controlador de memoria da CPU pelo driver de baixo nivel (o mesmo tipo de captura que eles usam).
+    Hoje essa leitura direta funciona em CPUs AMD Ryzen. Em outras plataformas, se o cpuz_x64.exe (portatil) estiver ao lado
+    do programa (ou em tools\), ele e usado em segundo plano; senao os campos ficam com "-" e a fonte explica o motivo.
+    Command Rate e tRFC dependem de registradores menos documentados: confira com o CPU-Z na primeira vez.
+  - GPU AMD e Intel: abas de Especificacoes, Overclock e Ventoinhas agora tem backend proprio.
+      * AMD Radeon: biblioteca ADL (atiadlxx.dll do driver) - Overdrive8 (RDNA 1/2/3/4): clock maximo do nucleo e da memoria
+        (mostrados como offset), limite de potencia (%), limite de temperatura e velocidade minima da ventoinha.
+        Placas GCN/Polaris (Overdrive 6): ventoinha. Requer "Ajuste manual" liberado no AMD Adrenalin.
+      * Intel Arc: biblioteca IGCL (ControlLib.dll do driver Intel) - offset de GPU/VRAM, limite de potencia e temperatura, ventoinha
+        (se o driver expuser). EXPERIMENTAL: o driver valida os limites e recusa valores fora da faixa.
+      * O que a placa/driver nao expoe aparece como "(indisponivel)" com o motivo.
+  - NVIDIA notebook: a aba OC agora detecta o que a placa realmente permite (TDP fixo, faixa de offset desconhecida...), so aplica
+    o que mudou, tenta NVML antigo -> NVML novo -> NvAPI (estrutura v2 e v1) e mostra o motivo exato do erro.
+  - Icone embutido no .exe (BunosTunner.ico, a esfera dourada). Mantenha o .ico ao lado do build.bat.
+  - 4 NOVOS TEMAS (seletor no topo, ao lado da GPU): Dark Mode (Escuro / AMOLED), Neon / Cyberpunk, Steampunk, Retro / Vintage
+    (alem de Luna e Frutiger Aero). O tema e lembrado entre aberturas.
+
+CORRECOES v1.7.1
+  - Removidos os avisos CS0649 (campos do tema preenchidos por reflexao).
+  - Aba Memoria: textos com acentos e layout que nao estoura com as fontes dos temas.
+  - Para testar problema de temperatura da CPU: no BunosTunner.ini adicione a linha vendoroc=0 (desliga os backends AMD/Intel de OC).
+
+
+=== v1.8.0 ===
+- Testes de estresse agora abrem uma janela de render: GPU (pelos estilo FurMark), CPU (render por blocos estilo Cinebench),
+  FPU (malha de ondas), RAM (mapa de memoria) e SSD (mapa de blocos). Fecha ao parar o teste.
+- PawnIO: a cada inicializacao o programa verifica se o driver esta instalado (quando o LibreHardwareMonitor das libs o usa).
+  Se faltar, explica o motivo e oferece baixar/instalar o PawnIO_setup.exe oficial.
+- Timings de memoria: leitura SMN tambem pelo modulo PawnIO (AmdFamily17). Intel nativo continua sem suporte; use o CPU-Z na pasta (plano B).
+- Fontes, janela, botoes e proporcoes agora identicos em todos os temas (so cores/formas mudam).
+- Nada disso foi compilado/testado no ambiente de desenvolvimento: se der erro de compilacao, envie a saida.
+
+=== v1.8.1 ===
+- PawnIO: o aviso agora aparece sempre que o driver nao estiver instalado.
+- Fechar a janela de render para o teste. No CPU, as threads do proprio render (todas as selecionadas) sao a carga; GPU/FPU/RAM/SSD continuam usando o motor do teste, e a janela e o controle dele.
+
+=== v1.8.2 ===
+- A verificacao do PawnIO agora roda no inicio do programa, antes de abrir a janela e de carregar os sensores.
+
+=== v1.9.0 ===
+- Aviso do PawnIO na abertura (se nao instalado): explica o motivo e abre o download oficial no navegador. Aparece a cada abertura enquanto nao estiver instalado.
+  (A deteccao procura o servico "PawnIO" no registro ou C:\Program Files\PawnIO\PawnIOLib.dll.)
+- Janelas de render dos testes agora sao a propria carga:
+  GPU = OpenGL real (shader pesado + ~360 mil linhas de pelos num toro; mostra FPS). Se OpenGL falhar, cai para o teste OpenCL.
+  CPU = fractal renderizado em blocos pelas threads (conta iteracoes). FPU = campo de ondas calculado em ponto flutuante (GFLOPS estimado).
+  RAM e SSD: o motor do teste continua a carga; a janela mostra o mapa. Fechar a janela interrompe qualquer teste.
+- Temas: Dark com corrida no deserto em branco suave (criatura original, cactos, nuvens, estrelas, passaros); Neon com sol/grade synthwave, LEDs e equalizador;
+  Steampunk mais cobre, com engrenagens girando e manometros animados. "Retro / Vintage" virou "Vintage (Windows 95)". Brancos do Dark/Neon/Steampunk trocados por tons do tema.
+- Nao compilado/testado no ambiente de desenvolvimento.
+
+=== v1.9.1 ===
+- Removida a animacao do dino/deserto do tema Dark.
+- Deteccao do PawnIO refeita (arquivo PawnIOLib.dll ou dispositivo do driver; nao confia mais so no registro).
+- Botao "Instalar PawnIO" no menu Ventoinhas (baixa o instalador oficial e executa como administrador).
+
+=== v1.9.2 ===
+- Aviso do menu OC agora usa as cores do tema (legivel em todos).
+- Timings: tenta Ring0, depois o modulo PawnIO do LibreHardwareMonitor e por fim o PawnIOLib.dll direto com o modulo embutido na DLL; a pagina de RAM mostra o motivo exato se falhar.
+  Requer LibreHardwareMonitorLib.dll recente (com PawnIO) em libs e execucao como administrador.
+- Botao LookUp nas especificacoes de CPU e GPU: abre a busca do TechPowerUp com o modelo.
+
+=== v1.10.0 ===
+- Titulos dos popups de benchmark sem o "(estilo ...)".
+- Estresse de CPU refeito: ray tracing 3D (esferas, reflexos, sombras, 8 amostras/pixel) renderizado por blocos a partir do centro, todas as threads; carga real (conta raios).
+- Novo tema "GTA VI (Vice City)" com animacao de fundo (por do sol, skyline, palmeiras, carro na orla).
+- Pagina de RAM: botao "Diagnostico" mostra/copiar o relatorio completo da leitura dos timings.
+
+=== v1.11.0 ===
+- Timings: procura automaticamente o registrador certo (a posicao varia) - baseado no seu diagnostico. Diagnostico agora lista mais registradores.
+- Tema GTA VI refeito: ceu vibrante, sol com brilho, skyline, roda-gigante girando, helicoptero, lancha, palmeiras e carro.
+- Benchmark: descricoes atualizadas, lembra as ultimas opcoes, botoes Copiar/Salvar CSV/Limpar, coluna de estabilidade, tempo restante, som ao concluir, dicas nas opcoes.
+
+=== v1.11.1 ===
+- GTA VI: veu escuro sobre a animacao e fontes mais claras (texto legivel).
+- CPU: ray tracing agora mostra tempo do render, ultimo/melhor tempo e pontos (Mrays/s x 100). Botao direito na janela salva o render em PNG. Esc fecha a janela e para o teste.
+- Benchmark: modo Sequencia (CPU, FPU, RAM, GPU), coluna "vs ant." (variacao contra o ultimo teste igual), titulo da janela de render com a taxa ao vivo.
+
+=== v1.12.0 ===
+- OC da AMD: o ADL agora lista tambem placas sem monitor ligado, le o tamanho real da estrutura do driver e aceita o adaptador pelo nome (Radeon/AMD). Se ainda falhar, a mensagem mostra os adaptadores que o driver informou. Nome da GPU em branco corrigido (usa o nome do Windows).
+- Abertura mais rapida: tela de abertura com a etapa atual; discos (SMART), rede, bateria e zonas ACPI carregam em segundo plano (a janela nao espera mais por eles). O arquivo BunosTunner_startup.log (ao lado do .exe) lista o tempo de cada etapa - se ainda estiver lento, envie esse arquivo.
+- Novo menu "Desinstalador" (entre Afinidade e Sensores): lista os programas, desinstala com o desinstalador oficial e procura o que sobrou (pastas, atalhos, registro, inicializacao, servicos, tarefas agendadas). "Remocao forcada" para o que se recusa a desinstalar; "Escolher pasta ou .exe" para programas portateis. Revise a lista (itens de certeza media vem desmarcados), pastas vao para a Lixeira, chaves do registro sao salvas em BunosTunner_backup antes de apagar, ponto de restauracao opcional. Pastas do sistema sao protegidas.
+- Benchmark refeito: um bloco por teste (GPU, CPU, FPU, RAM, SSD) com as opcoes dentro dele e, a direita, o icone que inicia/para o teste; botao "Rodar sequencia" e faixa de seguranca comuns.
+- build.bat agora referencia Microsoft.VisualBasic.dll (envio para a Lixeira).
+
+=== v1.12.1 ===
+- Desinstalador: "Escolher pasta ou .exe" agora mostra os botoes Pasta / Exe / Cancelar.
+- CPU: render muito mais pesado (1280x800, 32 amostras por pixel, ~16x mais trabalho por imagem).
+- RAM e SSD agora tem animacoes diferentes: RAM = modulo com chips sendo gravados/conferidos e fluxo de palavras hex; SSD = faixa de setores com cabecote, grafico de velocidade ao vivo e mapa de acessos 4K.
+
+=== v1.12.2 ===
+- Esc fecha a janela de Sensores.
+- Benchmark: removido o painel "Resultado ao vivo" (fica so a linha de status).
+
+=== v1.12.3 ===
+- Desinstalador: botao "Encerrar processos" (finaliza os processos e para os servicos do programa). Ao remover, os processos sao encerrados antes; arquivos/pastas protegidos ou em uso: toma posse + da controle total ao Administradores + tira somente-leitura e tenta de novo; se ainda estiver em uso, agenda a exclusao para o proximo reinicio. Chaves de registro negadas usam reg.exe como alternativa.
+
+=== v1.12.4 ===
+- Taxa de quadros reduzida: animacoes dos temas de ~15 para 8 quadros/s e janela de render do benchmark de ~30 para 20 quadros/s (menos uso de CPU).
+
+=== v1.13.0 ===
+- Novo menu "Internet" (abaixo da RAM): velocimetro real (ping, download e upload medidos de verdade, 4 conexoes, servidor Cloudflare) com numero ao vivo; botao "Mostrar informacoes da rede" (IP interno/externo, MAC, gateway, DNS, Wi-Fi, provedor, cidade) so mostra apos aviso de dados pessoais e confirmacao.
+
+=== v1.14.0 ===
+- Novo menu "Saude do armazenamento" (abaixo da RAM): lista os discos (NVMe, SATA, HDD) com saude, vida util restante, temperatura ao vivo, horas ligado, erros e atributos S.M.A.R.T.; usa o proprio Windows (Get-StorageReliabilityCounter) mais os sensores do LibreHardwareMonitor.
+- Timings: alem do metodo direto (AMD), usa o CPU-Z como alternativa universal (Intel e outras): procura em varias pastas, botao "Indicar CPU-Z..." e "Baixar CPU-Z". O CPU-Z e so executado para gerar o relatorio de texto.
+
+=== v1.15.0 ===
+- Menu RAM: teste de latencia da memoria (ns) estilo AIDA64 - ponteiro encadeado aleatorio de 4 KB a 256 MB, grafico da curva (L1/L2/L3/RAM) e valor grande da latencia da RAM.
+- Novo menu "Otimizacoes do Windows" (abaixo do Desinstalador): botao que roda a limpeza de temporarios (baseada no CacheCleaner.bat) como administrador. Logs de eventos so sao limpos se a opcao for marcada.
+
+=== v1.15.1 ===
+- Otimizacoes do Windows padronizado: cada ajuste e uma linha (titulo, descricao, botao e resultado). Limpeza de temporarios simplificada (sem opcao de logs) e nova opcao "Desativar/Reativar compressao de memoria" (Disable-MMAgent -mc).
+- Latencia da memoria: removida a referencia ao AIDA64 do titulo.
+
+=== v1.16.0 ===
+- Otimizacoes do Windows: novas linhas - Menu de clique direito do Windows 10, Desativar MPO, Overlay DLSS e Mitigacoes do Windows (Spectre/Meltdown), cada uma com botao de desfazer e estado atual. Aplicam direto no registro (sem abrir .bat/.reg).
+
+=== v1.17.0 ===
+- Otimizacoes do Windows: Isolamento de nucleo (Integridade de memoria), Hibernacao e Aceleracao do mouse (Aprimorar precisao do ponteiro), cada um com ativar/desativar e estado atual.
