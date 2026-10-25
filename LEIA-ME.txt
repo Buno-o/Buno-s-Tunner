@@ -235,3 +235,8 @@ CORRECOES v1.7.1
 
 === v1.17.0 ===
 - Otimizacoes do Windows: Isolamento de nucleo (Integridade de memoria), Hibernacao e Aceleracao do mouse (Aprimorar precisao do ponteiro), cada um com ativar/desativar e estado atual.
+
+=== v1.18.0 ===
+- Idiomas: padrao = idioma do Windows (portugues ou ingles); seletor "Idioma" na barra inferior (Auto / Portugues / English). Textos fixos dos menus, botoes, titulos e dicas traduzidos; mensagens dinamicas e alguns textos longos ainda aparecem em portugues.
+- Tema e Idioma foram para a barra inferior.
+- GitHub Actions (.github/workflows/build.yml): baixa o LibreHardwareMonitor 0.9.6 do NuGet, compila com build.bat e publica o .exe como artefato e Release.
