@@ -244,3 +244,6 @@ CORRECOES v1.7.1
 === v1.18.1 ===
 - Traducao completa para ingles: janelas de aviso (popups), dicas dos botoes, titulos das janelas (ex.: Sensores), menus de clique direito, listas, caixas de selecao, graficos e mensagens que aparecem durante o uso (status, erros, resultados). A troca de idioma vale na hora.
 - GitHub Actions corrigido: agora baixa a DLL certa do LibreHardwareMonitor, compila e publica o .exe em Releases a cada versao enviada para a main.
+
+=== v1.18.2 ===
+- Temas sem animacao: Neon e GTA VI agora tem cenarios em pixel art (cidade com chuva e sol de neon; praia com palmeiras, sol e conversivel). Steampunk ganhou arte realista com tubos de cobre, manometros analogicos, valvulas e engrenagens; os tubos tambem fazem parte das divisorias dos menus e das caixas de grupo. Proporcoes da janela inalteradas.

@@ -1721,7 +1721,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.18.1";
+        public const string Version = "v1.18.2";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2010,7 +2010,8 @@ namespace BunosTunner
             Graphics g = e.Graphics;
             Fx.Draw(this, g);
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using (GraphicsPath p = Xp.Round(new Rectangle(0, 8, Width, Height - 8), Xp.Aero ? 6 : 4))
+            if (Xp.Theme == 4) Fx.GroupPipe(g, Width, Height);
+            else using (GraphicsPath p = Xp.Round(new Rectangle(0, 8, Width, Height - 8), Xp.Aero ? 6 : 4))
             using (Pen pen = new Pen(Xp.GroupLine))
                 g.DrawPath(pen, p);
             if (Xp.Aero)
@@ -2063,7 +2064,8 @@ namespace BunosTunner
                 Bubble(g, 6, 190, 18);
                 using (Pen edge = new Pen(Color.FromArgb(150, 110, 160, 210))) g.DrawLine(edge, Width - 1, 0, Width - 1, Height);
             }
-            using (Pen dark = new Pen(Xp.SepDark))
+            if (Xp.Theme == 4) { Fx.HPipe(g, 6, Width - 6, 338, 7); Fx.VPipe(g, Width - 3, 0, Height, 5); }
+            else using (Pen dark = new Pen(Xp.SepDark))
             using (Pen light = new Pen(Xp.SepLight))
             {
                 g.DrawLine(dark, 10, 338, Width - 10, 338);
@@ -6390,14 +6392,31 @@ namespace BunosTunner
     }
 
     // ------------------------------------------------------------------
-    //  Animacoes de fundo dos temas (Neon: synthwave com LEDs, Steampunk: engrenagens e manometros)
+    //  Fundos estaticos dos temas (Neon e GTA VI: pixel art; Steampunk: tubos de cobre, manometros e engrenagens)
     // ------------------------------------------------------------------
     static class Fx
     {
-        static DateTime t0 = DateTime.UtcNow;
-        static Timer tm; static List<Control> targets = new List<Control>();
+        // Fundos dos temas (estaticos, sem animacao): Neon e GTA VI em pixel art, Steampunk em arte realista
+        static List<Control> targets = new List<Control>();
+        static Bitmap sNeon, sVice, sSteam;
+        static bool failed;
         public static bool On { get { return (Xp.Theme >= 3 && Xp.Theme <= 4) || Xp.Theme == 6; } }
         static Color A(int a, int r, int g, int b) { return Color.FromArgb(Math.Max(0, Math.Min(255, a)), r, g, b); }
+        static Color Hex(int rgb) { return Color.FromArgb((rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255); }
+        static Color HexA(int a, int rgb) { return Color.FromArgb(a, (rgb >> 16) & 255, (rgb >> 8) & 255, rgb & 255); }
+        static Color Lp(Color a, Color b, double t)
+        {
+            t = Math.Max(0, Math.Min(1, t));
+            return Color.FromArgb((int)(a.R + (b.R - a.R) * t), (int)(a.G + (b.G - a.G) * t), (int)(a.B + (b.B - a.B) * t));
+        }
+        static Color Ramp(Color[] st, double t)
+        {
+            t = Math.Max(0, Math.Min(1, t));
+            double f = t * (st.Length - 1);
+            int i = (int)f;
+            if (i >= st.Length - 1) return st[st.Length - 1];
+            return Lp(st[i], st[i + 1], f - i);
+        }
 
         public static void Hook(Control c)
         {
@@ -6407,23 +6426,24 @@ namespace BunosTunner
             if (c.GetType() == typeof(Panel))
             {
                 try { typeof(Control).GetProperty("DoubleBuffered", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(c, true, null); } catch (Exception) { }
+                c.Paint += delegate(object s, PaintEventArgs e) { Draw(c, e.Graphics); };
             }
-            if (c.GetType() == typeof(Panel)) c.Paint += delegate(object s, PaintEventArgs e) { Draw(c, e.Graphics); };
-            if (tm == null) { tm = new Timer(); tm.Interval = 125; tm.Tick += Tick; tm.Start(); }
         }
-        static void Tick(object s, EventArgs e)
+
+        static Bitmap Scene()
         {
-            if (!On) return;
-            foreach (Control c in targets.ToArray())
+            if (failed) return null;
+            try
             {
-                try
+                switch (Xp.Theme)
                 {
-                    if (!c.IsHandleCreated || !c.Visible) continue;
-                    Form f = c.FindForm();
-                    if (f != null && f.WindowState != FormWindowState.Minimized) c.Invalidate();
+                    case 3: if (sNeon == null) sNeon = MakeNeon(); return sNeon;
+                    case 4: if (sSteam == null) sSteam = MakeSteam(); return sSteam;
+                    case 6: if (sVice == null) sVice = MakeVice(); return sVice;
                 }
-                catch (Exception) { }
             }
+            catch (Exception) { failed = true; }
+            return null;
         }
 
         public static void Draw(Control c, Graphics g)
@@ -6431,306 +6451,601 @@ namespace BunosTunner
             if (!On) return;
             Form f = c.FindForm();
             if (f == null) return;
+            Bitmap sc = Scene();
+            if (sc == null) return;
             GraphicsState st = g.Save();
             try
             {
                 Point p = f.PointToClient(c.PointToScreen(Point.Empty));
                 g.TranslateTransform(-p.X, -p.Y);
-                g.SmoothingMode = SmoothingMode.AntiAlias;
                 Rectangle R = f.ClientRectangle;
-                double t = (DateTime.UtcNow - t0).TotalSeconds;
-                switch (Xp.Theme)
-                {
-                    case 3: Neon(g, R, t); break;
-                    case 4: Steam(g, R, t); break;
-                    case 6:
-                        Vice(g, R, t);
-                        using (SolidBrush veil = new SolidBrush(A(185, Xp.Face.R, Xp.Face.G, Xp.Face.B))) g.FillRectangle(veil, R);
-                        break;
-                }
+                g.InterpolationMode = Xp.Theme == 4 ? InterpolationMode.HighQualityBilinear : InterpolationMode.NearestNeighbor;
+                g.PixelOffsetMode = PixelOffsetMode.Half;
+                g.DrawImage(sc, R, 0, 0, sc.Width, sc.Height, GraphicsUnit.Pixel);
+                int va = Xp.Theme == 3 ? 150 : Xp.Theme == 6 ? 185 : 95;
+                using (SolidBrush veil = new SolidBrush(A(va, Xp.Face.R, Xp.Face.G, Xp.Face.B))) g.FillRectangle(veil, R);
             }
             catch (Exception) { }
             g.Restore(st);
         }
 
-        // ---------------- Steampunk ----------------
-        static void Gear(Graphics g, float cx, float cy, float r, int n, double ang, Color fill, Color line)
+        // ================= pixel art =================
+        static readonly int[] Bay = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 };
+
+        static void Sky(Bitmap b, int y0, int y1, Color[] st, int levels)
+        {
+            for (int y = y0; y < y1; y++)
+                for (int x = 0; x < b.Width; x++)
+                {
+                    double f = (y - y0) / (double)(y1 - y0) * levels;
+                    int lo = (int)f;
+                    if (f - lo > (Bay[(y & 3) * 4 + (x & 3)] + 0.5) / 16.0) lo++;
+                    b.SetPixel(x, y, Ramp(st, Math.Min(1.0, lo / (double)levels)));
+                }
+        }
+        static void Rc(Graphics g, Color c, int x, int y, int w, int h)
+        {
+            using (SolidBrush s = new SolidBrush(c)) g.FillRectangle(s, x, y, w, h);
+        }
+        static Graphics PxG(Bitmap b)
+        {
+            Graphics g = Graphics.FromImage(b);
+            g.SmoothingMode = SmoothingMode.None;
+            g.PixelOffsetMode = PixelOffsetMode.Half;
+            g.CompositingQuality = CompositingQuality.HighSpeed;
+            return g;
+        }
+        static void Disc(Graphics g, int cx, int cy, int r, Color top, Color bot, int cutFrom, int cutStep)
+        {
+            for (int dy = -r; dy <= r; dy++)
+            {
+                if (cutStep > 0 && dy > cutFrom && ((dy - cutFrom) % 8) < ((dy - cutFrom) / cutStep + 1)) continue;
+                int dx = (int)Math.Sqrt(r * r - dy * dy + 0.0);
+                Rc(g, Lp(top, bot, (dy + r) / (2.0 * r)), cx - dx, cy + dy, dx * 2 + 1, 1);
+            }
+        }
+        // linha "pixelada" (sem suavizacao)
+        static void PLine(Graphics g, Color c, int x0, int y0, int x1, int y1, int th)
+        {
+            int dx = Math.Abs(x1 - x0), dy = Math.Abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, err = dx - dy;
+            using (SolidBrush s = new SolidBrush(c))
+                while (true)
+                {
+                    g.FillRectangle(s, x0, y0, th, th);
+                    if (x0 == x1 && y0 == y1) break;
+                    int e2 = 2 * err;
+                    if (e2 > -dy) { err -= dy; x0 += sx; }
+                    if (e2 < dx) { err += dx; y0 += sy; }
+                }
+        }
+        static void PalmPx(Graphics g, int bx, int by, int h, double lean, Color trunk, Color ring, Color leaf, Color leafHi)
+        {
+            int cx = bx, cy = by;
+            for (int i = 0; i <= h; i++)
+            {
+                double u = i / (double)h;
+                cx = bx + (int)(lean * u * u * h * 0.5);
+                cy = by - i;
+                int w = i < h / 5 ? 4 : 3;
+                Rc(g, i % 6 == 0 ? ring : trunk, cx - w / 2, cy, w, 1);
+            }
+            double[] ang = { 8, 38, 66, 96, 126, 154, 178, -14, 200 };
+            double L = h * 0.46;
+            for (int k = 0; k < ang.Length; k++)
+            {
+                double a = ang[k] * Math.PI / 180;
+                for (int s = 0; s <= (int)L; s++)
+                {
+                    double t = s / L;
+                    int x = cx + (int)(Math.Cos(a) * L * t);
+                    int y = cy - (int)(Math.Sin(a) * L * t) + (int)(L * 0.75 * t * t);
+                    Rc(g, leaf, x, y, 2, 2);
+                    if (s % 3 == 0 && s > 3)
+                    {
+                        int d = t < 0.6 ? 3 : 2;
+                        Rc(g, leaf, x - d, y + d, 1, 2);
+                        Rc(g, leaf, x + d, y + d, 1, 2);
+                        Rc(g, leafHi, x, y - 1, 1, 1);
+                    }
+                }
+            }
+            Rc(g, leaf, cx - 2, cy - 1, 5, 4);
+            Rc(g, ring, cx - 2, cy + 3, 2, 2); Rc(g, ring, cx + 1, cy + 3, 2, 2);
+        }
+
+        static Bitmap MakeNeon()
+        {
+            const int W = 360, H = 250, HZ = 168;
+            Bitmap b = new Bitmap(W, H);
+            Random r = new Random(7);
+            Sky(b, 0, 150, new Color[] { Hex(0x07021a), Hex(0x1a0838), Hex(0x4a0f6e), Hex(0xb0188a), Hex(0xff3d9a) }, 14);
+            Color[] wc = { Hex(0x2ef9ff), Hex(0xffd23f), Hex(0xff3da8), Hex(0x9d5cff) };
+            using (Graphics g = PxG(b))
+            {
+                Rc(g, Hex(0xff3d9a), 0, 150, W, HZ - 150);
+                for (int i = 0; i < 90; i++)
+                {
+                    int x = r.Next(W), y = r.Next(120);
+                    Color c = r.Next(3) == 0 ? Hex(0x7df9ff) : Color.White;
+                    Rc(g, A(255 - y * 2, c.R, c.G, c.B), x, y, 1, 1);
+                    if (i % 10 == 0) { Rc(g, A(180, c.R, c.G, c.B), x - 1, y, 3, 1); Rc(g, A(180, c.R, c.G, c.B), x, y - 1, 1, 3); }
+                }
+                // sol de neon com listras
+                Disc(g, 252, 120, 46, Hex(0xffe45c), Hex(0xff2e93), 6, 11);
+                // predios ao fundo
+                int xx = 0;
+                while (xx < W)
+                {
+                    int w = r.Next(9, 22), h = r.Next(25, 80);
+                    Rc(g, Hex(0x2a0b4e), xx, 152 - h, w, h);
+                    Rc(g, Hex(0x3e1272), xx, 152 - h, w, 1);
+                    for (int wy = 152 - h + 3; wy < 148; wy += 4)
+                        for (int wx = xx + 2; wx < xx + w - 2; wx += 4)
+                            if (r.Next(5) == 0) Rc(g, Hex(0x8a2aa8), wx, wy, 1, 2);
+                    xx += w - (r.Next(3) == 0 ? 3 : 0);
+                }
+                // predios da frente com janelas e letreiros
+                xx = -4;
+                while (xx < W)
+                {
+                    int w = r.Next(14, 34), h = r.Next(50, 118), top = HZ - h;
+                    Rc(g, Hex(0x0e0620), xx, top, w, h);
+                    Rc(g, Hex(0x2b1257), xx, top, 1, h);
+                    Rc(g, Hex(0x1c0c3a), xx, top, w, 1);
+                    if (r.Next(3) == 0)
+                    {
+                        Rc(g, Hex(0x0e0620), xx + w / 2, top - 10, 1, 10);
+                        Rc(g, Hex(0xff2040), xx + w / 2, top - 11, 1, 1);
+                    }
+                    for (int wy = top + 4; wy < HZ - 4; wy += 4)
+                        for (int wx = xx + 3; wx < xx + w - 3; wx += 3)
+                            if (r.Next(4) == 0) Rc(g, wc[r.Next(4)], wx, wy, 2, 2);
+                    if (w >= 20 && r.Next(2) == 0)
+                    {
+                        Color sc = wc[r.Next(3)];
+                        int sx = xx + w - 7, sy = top + 8;
+                        Rc(g, A(55, sc.R, sc.G, sc.B), sx - 2, sy - 2, 9, 26);
+                        Rc(g, sc, sx, sy, 5, 1); Rc(g, sc, sx, sy + 21, 5, 1); Rc(g, sc, sx, sy, 1, 22); Rc(g, sc, sx + 4, sy, 1, 22);
+                        for (int q = 3; q < 20; q += 4) Rc(g, Color.White, sx + 2, sy + q, 1, 2);
+                    }
+                    xx += w + r.Next(0, 4);
+                }
+                // rua molhada
+                Rc(g, Hex(0x12052a), 0, HZ, W, H - HZ);
+                for (int y = HZ + 2; y < H; y += 3)
+                {
+                    int x1 = r.Next(W), len = r.Next(14, 70);
+                    Color c = wc[r.Next(3)];
+                    Rc(g, A(70, c.R, c.G, c.B), x1, y, len, 1);
+                }
+                using (Pen p = new Pen(HexA(190, 0xff2e93), 1f))
+                {
+                    for (int k = -16; k <= 16; k++) g.DrawLine(p, 180 + k * 3, HZ, 180 + k * 46, H);
+                }
+                using (Pen p = new Pen(HexA(170, 0x2ef9ff), 1f))
+                {
+                    for (int i = 1; i <= 9; i++)
+                    {
+                        int y = HZ + (int)(Math.Pow(i / 9.0, 2) * (H - HZ - 1));
+                        g.DrawLine(p, 0, y, W, y);
+                    }
+                }
+                // chuva
+                for (int i = 0; i < 140; i++)
+                {
+                    int x = r.Next(W), y = r.Next(H - 8);
+                    Rc(g, HexA(90, 0x9fe8ff), x, y, 1, 2);
+                    Rc(g, HexA(60, 0x9fe8ff), x - 1, y + 2, 1, 2);
+                }
+            }
+            return b;
+        }
+
+        static Bitmap MakeVice()
+        {
+            const int W = 360, H = 250, HZ = 142;
+            Bitmap b = new Bitmap(W, H);
+            Random r = new Random(11);
+            Sky(b, 0, HZ, new Color[] { Hex(0x1a0b3d), Hex(0x5a1b7a), Hex(0xc4357e), Hex(0xff6a5c), Hex(0xffb347), Hex(0xffe29a) }, 18);
+            Sky(b, HZ, 192, new Color[] { Hex(0xff8a6b), Hex(0xd23a86), Hex(0x6b1b8c), Hex(0x2a0f5c) }, 12);
+            using (Graphics g = PxG(b))
+            {
+                for (int i = 0; i < 40; i++) { int x = r.Next(W), y = r.Next(40); Rc(g, A(230 - y * 4, 255, 255, 255), x, y, 1, 1); }
+                // sol
+                Disc(g, 180, 126, 48, Hex(0xfff3a0), Hex(0xff5e7e), 4, 9);
+                Rc(g, Hex(0xffb347), 0, HZ - 1, W, 1);
+                // nuvens em barras
+                int[][] cl = { new int[] { 30, 60, 52, 3 }, new int[] { 260, 48, 60, 3 }, new int[] { 70, 84, 38, 2 }, new int[] { 230, 92, 46, 2 }, new int[] { 140, 40, 34, 2 }, new int[] { 300, 100, 40, 2 } };
+                foreach (int[] q in cl)
+                {
+                    Rc(g, HexA(210, 0xff8fb8), q[0], q[1], q[2], q[3]);
+                    Rc(g, HexA(210, 0xffd0e0), q[0] + 3, q[1] - 1, q[2] - 8, 1);
+                    Rc(g, HexA(160, 0x5a1b7a), q[0] + 6, q[1] + q[3], q[2] - 10, 1);
+                }
+                // skyline art deco ao fundo
+                Color[] pa = { Hex(0xff8fb8), Hex(0x4ee3d0), Hex(0xc9a0ff), Hex(0xffc0a0) };
+                int xx = 4;
+                while (xx < W - 8)
+                {
+                    int w = r.Next(10, 20), h = r.Next(14, 46);
+                    Color c = Lp(pa[r.Next(4)], Hex(0x8a3a8a), 0.45);
+                    Rc(g, c, xx, HZ - h, w, h);
+                    Rc(g, Lp(c, Color.White, 0.35), xx, HZ - h, w, 1);
+                    Rc(g, Lp(c, Color.Black, 0.3), xx + w - 2, HZ - h, 2, h);
+                    if (r.Next(3) == 0) { Rc(g, c, xx + 2, HZ - h - 4, w - 4, 4); Rc(g, Lp(c, Color.White, 0.3), xx + 2, HZ - h - 4, w - 4, 1); }
+                    for (int wy = HZ - h + 3; wy < HZ - 2; wy += 3)
+                        for (int wx = xx + 2; wx < xx + w - 3; wx += 3)
+                            if (r.Next(3) == 0) Rc(g, HexA(200, 0xfff3a0), wx, wy, 1, 1);
+                    if (r.Next(6) == 0) { Rc(g, c, xx + w / 2, HZ - h - 14, 1, 14); }
+                    xx += w + r.Next(0, 3);
+                }
+                // reflexo do sol no mar
+                for (int y = HZ + 1; y < 190; y += 2)
+                {
+                    double t = (y - HZ) / 48.0;
+                    int w = (int)(70 * (1 - t * 0.6)) + r.Next(-6, 7);
+                    int off = r.Next(-3, 4);
+                    Rc(g, A((int)(230 - t * 90), 255, 226, 150), 180 - w / 2 + off, y, Math.Max(4, w), 1);
+                }
+                for (int y = HZ + 4; y < 190; y += 5)
+                    Rc(g, HexA(120, 0xffb0c8), r.Next(W), y, r.Next(6, 22), 1);
+                // faixa de areia e rua
+                Rc(g, Hex(0xf4b8a0), 0, 192, W, 6);
+                Rc(g, Hex(0xd88a8a), 0, 196, W, 2);
+                Rc(g, Hex(0x2a1546), 0, 198, W, H - 198);
+                Rc(g, Hex(0xff3da8), 0, 198, W, 1);
+                Rc(g, Hex(0x2ef9ff), 0, 199, W, 1);
+                for (int x = 6; x < W; x += 34) Rc(g, Hex(0xfff3a0), x, 226, 18, 2);
+                for (int x = 0; x < W; x += 5) Rc(g, Hex(0x3a1c60), x + (x / 5) % 2 * 2, 236 + (x / 5) % 3 * 3, 3, 1);
+                // palmeiras (silhuetas)
+                Color tr = Hex(0x1c0a33), rg = Hex(0x321452), lf = Hex(0x14072a), lh = Hex(0x4b1f6e);
+                PalmPx(g, 38, 214, 132, -0.35, tr, rg, lf, lh);
+                PalmPx(g, 96, 210, 84, 0.3, tr, rg, lf, lh);
+                PalmPx(g, 324, 216, 150, 0.4, tr, rg, lf, lh);
+                PalmPx(g, 276, 208, 78, -0.25, tr, rg, lf, lh);
+                // conversivel na orla
+                int cx = 196, cy = 212;
+                Rc(g, HexA(110, 0x2ef9ff), cx - 2, cy + 11, 66, 2);
+                Rc(g, Hex(0x1a0b2e), cx, cy + 3, 62, 8);
+                Rc(g, Hex(0x1a0b2e), cx + 4, cy - 1, 18, 4); Rc(g, Hex(0x1a0b2e), cx + 20, cy - 3, 14, 6);
+                Rc(g, Hex(0xff3da8), cx, cy + 6, 62, 1);
+                Rc(g, Hex(0x7df9ff), cx + 22, cy - 2, 9, 3);
+                Rc(g, Hex(0xff2040), cx - 1, cy + 4, 2, 2); Rc(g, Hex(0xfff3a0), cx + 61, cy + 5, 2, 2);
+                foreach (int wx in new int[] { cx + 10, cx + 48 })
+                {
+                    Rc(g, Hex(0x0a0418), wx - 4, cy + 7, 9, 7); Rc(g, Hex(0x0a0418), wx - 3, cy + 6, 7, 9);
+                    Rc(g, Hex(0x2ef9ff), wx - 1, cy + 9, 3, 3);
+                }
+            }
+            return b;
+        }
+
+        // ================= Steampunk (arte realista, estatica) =================
+        static Color Cu(double f)
+        {
+            return Ramp(new Color[] { Hex(0x3a1c08), Hex(0x8a4a1c), Hex(0xd98a4a), Hex(0xf6c79a), Hex(0xb5601f), Hex(0x5a2c0e), Hex(0x2a1306) }, f);
+        }
+        static void PipeLine(Graphics g, float x1, float y1, float x2, float y2, float th)
+        {
+            double dx = x2 - x1, dy = y2 - y1, len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 0.5) return;
+            float nx = (float)(-dy / len), ny = (float)(dx / len);
+            int n = Math.Max(2, (int)th);
+            for (int i = 0; i <= n; i++)
+            {
+                float o = i - th / 2f;
+                using (Pen p = new Pen(Cu(i / (double)n), 1.7f)) g.DrawLine(p, x1 + nx * o, y1 + ny * o, x2 + nx * o, y2 + ny * o);
+            }
+        }
+        static void PipeArc(Graphics g, float cx, float cy, float r, float a0, float sweep, float th)
+        {
+            int n = Math.Max(2, (int)th);
+            for (int i = 0; i <= n; i++)
+            {
+                float rr = r + i - th / 2f;
+                using (Pen p = new Pen(Cu(i / (double)n), 1.7f)) g.DrawArc(p, cx - rr, cy - rr, 2 * rr, 2 * rr, a0, sweep);
+            }
+        }
+        static void Bolt(Graphics g, float x, float y, float r)
+        {
+            using (SolidBrush d = new SolidBrush(A(200, 30, 16, 4))) g.FillEllipse(d, x - r - 0.6f, y - r - 0.3f, 2 * r + 1.4f, 2 * r + 1.4f);
+            RectangleF rc = new RectangleF(x - r, y - r, 2 * r, 2 * r);
+            using (LinearGradientBrush lb = new LinearGradientBrush(rc, Hex(0xf5da92), Hex(0x6a4510), 45f)) g.FillEllipse(lb, rc);
+            using (SolidBrush h = new SolidBrush(A(200, 255, 245, 210))) g.FillEllipse(h, x - r * 0.5f, y - r * 0.55f, r * 0.5f, r * 0.4f);
+        }
+        static void Collar(Graphics g, float cx, float cy, float len, float th, bool horiz)
+        {
+            float w = horiz ? len : th + 10, h = horiz ? th + 10 : len;
+            RectangleF rc = new RectangleF(cx - w / 2, cy - h / 2, w, h);
+            using (SolidBrush sh = new SolidBrush(A(90, 0, 0, 0))) g.FillRectangle(sh, rc.X + 3, rc.Y + 4, rc.Width, rc.Height);
+            using (LinearGradientBrush lb = new LinearGradientBrush(rc, Hex(0xf1d487), Hex(0x6e4a12), horiz ? 90f : 0f))
+            {
+                ColorBlend cb = new ColorBlend(5);
+                cb.Positions = new float[] { 0f, 0.2f, 0.45f, 0.75f, 1f };
+                cb.Colors = new Color[] { Hex(0x7a5416), Hex(0xe9c46c), Hex(0xfbe9b0), Hex(0xb98a2a), Hex(0x4e330a) };
+                lb.InterpolationColors = cb;
+                g.FillRectangle(lb, rc);
+            }
+            using (Pen e = new Pen(A(230, 40, 22, 6), 1.2f)) g.DrawRectangle(e, rc.X, rc.Y, rc.Width, rc.Height);
+            if (horiz) { Bolt(g, cx, rc.Y + 4, 2.4f); Bolt(g, cx, rc.Bottom - 4, 2.4f); }
+            else { Bolt(g, rc.X + 4, cy, 2.4f); Bolt(g, rc.Right - 4, cy, 2.4f); }
+        }
+        static void Joint(Graphics g, float cx, float cy, float r)
+        {
+            using (SolidBrush sh = new SolidBrush(A(90, 0, 0, 0))) g.FillEllipse(sh, cx - r + 3, cy - r + 4, 2 * r, 2 * r);
+            using (GraphicsPath gp = new GraphicsPath())
+            {
+                gp.AddEllipse(cx - r, cy - r, 2 * r, 2 * r);
+                using (PathGradientBrush pb = new PathGradientBrush(gp))
+                {
+                    pb.CenterColor = Hex(0xfbe9b0); pb.SurroundColors = new Color[] { Hex(0x5a3a0c) };
+                    pb.CenterPoint = new PointF(cx - r * 0.35f, cy - r * 0.4f);
+                    g.FillPath(pb, gp);
+                }
+            }
+            using (Pen e = new Pen(A(220, 40, 22, 6), 1.2f)) g.DrawEllipse(e, cx - r, cy - r, 2 * r, 2 * r);
+            for (int k = 0; k < 6; k++) Bolt(g, cx + (float)Math.Cos(k * Math.PI / 3) * r * 0.62f, cy + (float)Math.Sin(k * Math.PI / 3) * r * 0.62f, 1.8f);
+        }
+        static PointF[] GearPts(float cx, float cy, float r, int n, double ang)
         {
             PointF[] pts = new PointF[n * 4];
             double w = 2 * Math.PI / n;
             for (int i = 0; i < n; i++)
             {
                 double a0 = ang + i * w;
-                double[] aa = { a0, a0 + w * 0.18, a0 + w * 0.42, a0 + w * 0.6 };
-                float[] rr = { r * 0.82f, r, r, r * 0.82f };
+                double[] aa = { a0, a0 + w * 0.16, a0 + w * 0.40, a0 + w * 0.56 };
+                float[] rr = { r * 0.84f, r, r, r * 0.84f };
                 for (int k = 0; k < 4; k++) pts[i * 4 + k] = new PointF(cx + (float)(Math.Cos(aa[k]) * rr[k]), cy + (float)(Math.Sin(aa[k]) * rr[k]));
             }
-            using (SolidBrush b = new SolidBrush(fill)) g.FillPolygon(b, pts);
-            using (Pen p = new Pen(line, 1.5f))
-            {
-                g.DrawPolygon(p, pts);
-                g.DrawEllipse(p, cx - r * 0.55f, cy - r * 0.55f, r * 1.1f, r * 1.1f);
-                g.DrawEllipse(p, cx - r * 0.16f, cy - r * 0.16f, r * 0.32f, r * 0.32f);
-                for (int k = 0; k < 4; k++)
-                {
-                    double a = ang + k * Math.PI / 2;
-                    g.DrawLine(p, cx + (float)(Math.Cos(a) * r * 0.16), cy + (float)(Math.Sin(a) * r * 0.16), cx + (float)(Math.Cos(a) * r * 0.55), cy + (float)(Math.Sin(a) * r * 0.55));
-                }
-            }
+            return pts;
         }
-        static void Gauge(Graphics g, float cx, float cy, float r, double v)
+        static void GearR(Graphics g, float cx, float cy, float r, int n, double rot, Color lite, Color dark)
         {
-            using (SolidBrush b = new SolidBrush(A(70, 250, 235, 200))) g.FillEllipse(b, cx - r, cy - r, 2 * r, 2 * r);
-            using (Pen rim = new Pen(A(160, 130, 76, 24), 3f)) g.DrawEllipse(rim, cx - r, cy - r, 2 * r, 2 * r);
-            using (Pen tk = new Pen(A(150, 60, 35, 10), 1.5f))
-                for (int i = 0; i <= 10; i++)
-                {
-                    double a = (135 + i * 27) * Math.PI / 180;
-                    float r1 = r * 0.82f, r2 = r * (i % 5 == 0 ? 0.62f : 0.72f);
-                    g.DrawLine(tk, cx + (float)(Math.Cos(a) * r1), cy + (float)(Math.Sin(a) * r1), cx + (float)(Math.Cos(a) * r2), cy + (float)(Math.Sin(a) * r2));
-                }
-            using (Pen rz = new Pen(A(170, 190, 40, 20), 3f)) g.DrawArc(rz, cx - r * 0.88f, cy - r * 0.88f, r * 1.76f, r * 1.76f, 135 + 27 * 8, 54);
-            double na = (135 + v * 270) * Math.PI / 180;
-            using (Pen n = new Pen(A(230, 90, 20, 10), 2f)) g.DrawLine(n, cx, cy, cx + (float)(Math.Cos(na) * r * 0.74), cy + (float)(Math.Sin(na) * r * 0.74));
-            using (SolidBrush hub = new SolidBrush(A(220, 110, 60, 20))) g.FillEllipse(hub, cx - 4, cy - 4, 8, 8);
-        }
-        static void Steam(Graphics g, Rectangle R, double t)
-        {
-            float W = R.Width, H = R.Height;
-            Color fill = A(60, 176, 104, 40), line = A(120, 110, 60, 15);
-            float py = H * 0.42f;
-            using (Pen pipe = new Pen(A(80, 160, 90, 36), 14f)) { g.DrawLine(pipe, 0, py, W, py); g.DrawLine(pipe, W * 0.62f, py, W * 0.62f, H); }
-            using (Pen hl = new Pen(A(70, 245, 195, 120), 3f)) g.DrawLine(hl, 0, py - 4, W, py - 4);
-            using (SolidBrush rv = new SolidBrush(A(110, 90, 50, 16))) for (float x = 20; x < W; x += 48) g.FillEllipse(rv, x, py - 2, 5, 5);
-            float[][] gs = {
-                new float[] { 0.09f, 0.16f, 64, 12, 1 }, new float[] { 0.20f, 0.27f, 40, 8, -1 }, new float[] { 0.86f, 0.14f, 58, 14, -1 },
-                new float[] { 0.93f, 0.30f, 34, 8, 1 }, new float[] { 0.88f, 0.84f, 92, 18, 1 }, new float[] { 0.50f, 0.93f, 50, 10, -1 }, new float[] { 0.06f, 0.78f, 56, 12, -1 }, new float[] { 0.16f, 0.90f, 34, 8, 1 } };
-            foreach (float[] q in gs) Gear(g, W * q[0], H * q[1], q[2], (int)q[3], t * 0.5 * q[4] * (40.0 / q[2]), fill, line);
-            Gauge(g, W * 0.72f, H * 0.58f, 46, 0.5 + 0.4 * Math.Sin(t * 0.8));
-            Gauge(g, W * 0.30f, H * 0.74f, 38, 0.5 + 0.42 * Math.Sin(t * 1.1 + 1.3));
-            Gauge(g, W * 0.12f, H * 0.52f, 32, 0.5 + 0.4 * Math.Sin(t * 0.6 + 2.2));
-            Gauge(g, W * 0.50f, H * 0.12f, 36, 0.5 + 0.4 * Math.Sin(t * 1.4 + 0.5));
-            for (int k = 0; k < 6; k++)
-            {
-                float age = (float)((t * 34 + k * 38) % 228), px = W * 0.62f + (float)Math.Sin(t + k) * 6, pyy = py - 8 - age, rr = 7 + age * 0.12f;
-                using (SolidBrush pf = new SolidBrush(A(70 - (int)(age * 0.3), 255, 245, 228))) g.FillEllipse(pf, px - rr, pyy - rr, rr * 2, rr * 2);
-            }
-        }
-
-        // ---------------- GTA VI (Vice City): por do sol, palmeiras, skyline e carro na orla ----------------
-        static Random vr = new Random(9);
-        static float[] bx, bw, bh;
-        static void ViceInit()
-        {
-            if (bx != null) return;
-            Random r = new Random(21);
-            int n = 26; bx = new float[n]; bw = new float[n]; bh = new float[n];
-            float x = 0;
-            for (int i = 0; i < n; i++) { bx[i] = x; bw[i] = 0.02f + (float)r.NextDouble() * 0.03f; bh[i] = 0.05f + (float)r.NextDouble() * 0.17f; x += bw[i] + 0.004f; }
-        }
-        static void Palm(Graphics g, float x, float baseY, float h, float lean, double t, float phase)
-        {
-            float sway = (float)Math.Sin(t * 0.9 + phase) * 6f;
-            PointF top = new PointF(x + lean + sway, baseY - h);
-            PointF mid = new PointF(x + lean * 0.3f, baseY - h * 0.5f);
-            using (Pen tr = new Pen(A(235, 14, 4, 26), 7f))
-            {
-                tr.StartCap = LineCap.Round; tr.EndCap = LineCap.Round;
-                g.DrawCurve(tr, new PointF[] { new PointF(x, baseY), mid, top });
-            }
-            using (Pen fr = new Pen(A(235, 14, 4, 26), 3f))
-            {
-                fr.EndCap = LineCap.Round;
-                for (int k = 0; k < 8; k++)
-                {
-                    double a = -Math.PI + k * Math.PI / 7 + Math.Sin(t * 1.3 + k + phase) * 0.06;
-                    float len = h * 0.42f;
-                    PointF e = new PointF(top.X + (float)Math.Cos(a) * len, top.Y + (float)Math.Sin(a) * len * 0.55f + len * 0.35f);
-                    PointF c = new PointF(top.X + (float)Math.Cos(a) * len * 0.55f, top.Y + (float)Math.Sin(a) * len * 0.75f - 6);
-                    g.DrawCurve(fr, new PointF[] { top, c, e });
-                }
-            }
-        }
-        static void Wheel(Graphics g, float cx, float cy, float r, float baseY, double t)
-        {
-            using (Pen leg = new Pen(A(235, 20, 6, 42), 4f))
-            {
-                g.DrawLine(leg, cx, cy, cx - r * 0.55f, baseY); g.DrawLine(leg, cx, cy, cx + r * 0.55f, baseY);
-            }
-            using (Pen rim = new Pen(A(235, 20, 6, 42), 3f)) { g.DrawEllipse(rim, cx - r, cy - r, 2 * r, 2 * r); g.DrawEllipse(rim, cx - r * 0.6f, cy - r * 0.6f, r * 1.2f, r * 1.2f); }
-            using (Pen sp = new Pen(A(210, 20, 6, 42), 1.5f))
-            using (SolidBrush gd = new SolidBrush(Color.Black))
-                for (int k = 0; k < 12; k++)
-                {
-                    double a = t * 0.18 + k * Math.PI / 6;
-                    float ex = cx + (float)Math.Cos(a) * r, ey = cy + (float)Math.Sin(a) * r;
-                    g.DrawLine(sp, cx, cy, ex, ey);
-                    gd.Color = (k % 3 == 0) ? A(245, 255, 70, 150) : (k % 3 == 1 ? A(245, 255, 200, 70) : A(245, 70, 220, 230));
-                    g.FillEllipse(gd, ex - 5, ey - 5, 10, 10);
-                }
-        }
-        static void Vice(Graphics g, Rectangle R, double t)
-        {
-            ViceInit();
-            float W = R.Width, H = R.Height, hz = H * 0.70f, cx = W * 0.5f;
-            // ceu em degrade vibrante
-            using (LinearGradientBrush sky = new LinearGradientBrush(new RectangleF(0, 0, W, hz + 1), Color.Black, Color.Black, 90f))
-            {
-                ColorBlend cb = new ColorBlend(5);
-                cb.Positions = new float[] { 0f, 0.3f, 0.6f, 0.85f, 1f };
-                cb.Colors = new Color[] { A(235, 52, 14, 120), A(230, 190, 30, 150), A(230, 255, 70, 120), A(235, 255, 140, 70), A(240, 255, 215, 90) };
-                sky.InterpolationColors = cb;
-                g.FillRectangle(sky, 0, 0, W, hz);
-            }
-            float sr = H * 0.17f, sy = hz - sr * 0.5f + (float)Math.Sin(t * 0.3) * 4f;
+            PointF[] pts = GearPts(cx, cy, r, n, rot);
+            PointF[] sh = new PointF[pts.Length];
+            for (int i = 0; i < pts.Length; i++) sh[i] = new PointF(pts[i].X + r * 0.07f, pts[i].Y + r * 0.1f);
+            using (SolidBrush sb = new SolidBrush(A(100, 0, 0, 0))) g.FillPolygon(sb, sh);
             using (GraphicsPath gp = new GraphicsPath())
             {
-                gp.AddEllipse(cx - sr * 1.9f, sy - sr * 1.9f, sr * 3.8f, sr * 3.8f);
+                gp.AddPolygon(pts);
                 using (PathGradientBrush pb = new PathGradientBrush(gp))
                 {
-                    pb.CenterColor = A(120, 255, 200, 90); pb.SurroundColors = new Color[] { A(0, 255, 90, 120) };
+                    pb.CenterColor = lite; pb.SurroundColors = new Color[] { dark };
+                    pb.CenterPoint = new PointF(cx - r * 0.3f, cy - r * 0.3f);
                     g.FillPath(pb, gp);
                 }
             }
-            using (LinearGradientBrush sun = new LinearGradientBrush(new RectangleF(cx - sr, sy - sr, sr * 2, sr * 2), A(255, 255, 245, 120), A(255, 255, 70, 140), 90f))
-                g.FillEllipse(sun, cx - sr, sy - sr, sr * 2, sr * 2);
-            using (Pen cut = new Pen(A(255, 200, 40, 130), 2f))
-                for (int k = 1; k <= 5; k++) { cut.Width = k * 0.9f; float y = sy + sr * 0.05f + k * sr * 0.16f; if (y < hz) g.DrawLine(cut, cx - sr, y, cx + sr, y); }
-            using (SolidBrush st = new SolidBrush(Color.Black))
-                for (int i = 0; i < 36; i++)
-                {
-                    double tw = 0.5 + 0.5 * Math.Sin(t * 1.6 + i * 2.3);
-                    st.Color = A(40 + (int)(150 * tw), 255, 235, 245);
-                    g.FillEllipse(st, (i * 97 % 1000) / 1000f * W, (i * 53 % 100) / 100f * hz * 0.45f, 2, 2);
-                }
-            using (SolidBrush cl = new SolidBrush(A(110, 255, 120, 190)))
-                for (int i = 0; i < 4; i++)
-                {
-                    float x = (float)((i * (W + 260) / 4.0 + t * (6 + i * 2)) % (W + 260)) - 130, y = H * (0.10f + 0.08f * i);
-                    g.FillEllipse(cl, x, y, 190, 16); g.FillEllipse(cl, x + 36, y - 7, 110, 15);
-                }
-            // helicoptero cruzando
-            float hx = W - (float)((t * 55) % (W + 400)) + 100, hy = H * 0.2f + (float)Math.Sin(t * 1.1) * 6f;
-            using (SolidBrush hb = new SolidBrush(A(240, 22, 6, 44)))
-            using (Pen hp = new Pen(A(240, 22, 6, 44), 2f))
+            using (Pen e = new Pen(A(230, 38, 20, 6), Math.Max(1.2f, r * 0.02f))) g.DrawPolygon(e, pts);
+            float ri = r * 0.72f, rh = r * 0.2f;
+            // vazados entre os raios
+            using (SolidBrush hole = new SolidBrush(A(200, 22, 12, 4))) g.FillEllipse(hole, cx - ri, cy - ri, 2 * ri, 2 * ri);
+            using (Pen p = new Pen(A(255, 120, 74, 24), r * 0.07f)) g.DrawEllipse(p, cx - ri, cy - ri, 2 * ri, 2 * ri);
+            using (Pen p = new Pen(A(200, 245, 205, 130), 1.2f)) g.DrawEllipse(p, cx - ri - r * 0.03f, cy - ri - r * 0.03f, 2 * ri, 2 * ri);
+            int spokes = n >= 10 ? 6 : 5;
+            for (int k = 0; k < spokes; k++)
             {
-                g.FillEllipse(hb, hx, hy, 34, 12); g.DrawLine(hp, hx + 30, hy + 5, hx + 52, hy + 1); g.DrawLine(hp, hx + 17, hy, hx + 17, hy - 5);
-                float rl = 26f * (float)Math.Abs(Math.Cos(t * 30));
-                g.DrawLine(hp, hx + 17 - rl, hy - 5, hx + 17 + rl, hy - 5);
+                double a = rot + k * 2 * Math.PI / spokes;
+                float x1 = cx + (float)Math.Cos(a) * rh, y1 = cy + (float)Math.Sin(a) * rh, x2 = cx + (float)Math.Cos(a) * ri, y2 = cy + (float)Math.Sin(a) * ri;
+                using (Pen p = new Pen(A(255, 70, 40, 12), r * 0.15f)) g.DrawLine(p, x1 + 1.5f, y1 + 2f, x2 + 1.5f, y2 + 2f);
+                using (Pen p = new Pen(Lp(dark, lite, 0.55), r * 0.12f)) g.DrawLine(p, x1, y1, x2, y2);
+                using (Pen p = new Pen(A(190, 250, 225, 170), Math.Max(1f, r * 0.03f))) g.DrawLine(p, x1 - 1, y1 - 1, x2 - 1, y2 - 1);
             }
-            if (((int)(t * 2)) % 2 == 0) using (SolidBrush rb = new SolidBrush(A(255, 255, 40, 60))) g.FillEllipse(rb, hx + 50, hy - 1, 4, 4);
-            // skyline
-            using (SolidBrush bd = new SolidBrush(A(245, 28, 8, 54)))
-            using (SolidBrush win = new SolidBrush(Color.Black))
+            using (GraphicsPath hp = new GraphicsPath())
             {
-                for (int i = 0; i < bx.Length; i++)
+                hp.AddEllipse(cx - rh, cy - rh, 2 * rh, 2 * rh);
+                using (PathGradientBrush pb = new PathGradientBrush(hp))
                 {
-                    float x0 = bx[i] * W * 1.25f + W * 0.02f, w = bw[i] * W * 1.25f, h = bh[i] * H;
-                    if (x0 > W) break;
-                    g.FillRectangle(bd, x0, hz - h, w, h);
-                    for (int wy = 0; wy < (int)(h / 9) - 1; wy++)
-                        for (int wx = 0; wx < (int)(w / 7); wx++)
-                        {
-                            double ph = Math.Sin(t * 0.7 + i * 3.1 + wx * 1.7 + wy * 2.3);
-                            if (ph > 0.45) { win.Color = ph > 0.8 ? A(230, 255, 120, 190) : A(210, 255, 215, 100); g.FillRectangle(win, x0 + 3 + wx * 7, hz - h + 5 + wy * 9, 3, 4); }
-                        }
+                    pb.CenterColor = Hex(0xfbe9b0); pb.SurroundColors = new Color[] { Hex(0x6a4510) };
+                    pb.CenterPoint = new PointF(cx - rh * 0.35f, cy - rh * 0.4f);
+                    g.FillPath(pb, hp);
                 }
             }
-            Wheel(g, W * 0.80f, hz - H * 0.15f, H * 0.12f, hz, t);
-            // mar com reflexo
-            using (LinearGradientBrush sea = new LinearGradientBrush(new RectangleF(0, hz, W, H - hz + 1), A(215, 160, 40, 130), A(235, 30, 8, 60), 90f))
-                g.FillRectangle(sea, 0, hz, W, H - hz);
-            using (Pen sh = new Pen(A(170, 255, 205, 100), 2f))
-                for (int k = 0; k < 10; k++)
-                {
-                    float y = hz + 6 + k * (H - hz) / 12f, half = sr * (1.0f - k * 0.07f) + (float)Math.Sin(t * 2 + k) * 10f;
-                    if (half > 4) g.DrawLine(sh, cx - half, y, cx + half, y);
-                }
-            // lancha com rastro
-            float bxp = (float)((t * 90) % (W + 200)) - 100, byp = hz + (H - hz) * 0.38f;
-            using (SolidBrush boat = new SolidBrush(A(240, 22, 6, 44))) g.FillPolygon(boat, new PointF[] { new PointF(bxp, byp), new PointF(bxp + 30, byp), new PointF(bxp + 38, byp - 6), new PointF(bxp + 4, byp - 8) });
-            using (Pen wake = new Pen(A(130, 255, 255, 255), 2f)) { g.DrawLine(wake, bxp, byp, bxp - 60, byp + 2); g.DrawLine(wake, bxp, byp + 3, bxp - 80, byp + 5); }
-            Palm(g, W * 0.07f, hz + 40, H * 0.46f, 24, t, 0f);
-            Palm(g, W * 0.13f, hz + 52, H * 0.34f, -14, t, 1.7f);
-            Palm(g, W * 0.95f, hz + 44, H * 0.5f, -26, t, 0.8f);
-            Palm(g, W * 0.89f, hz + 56, H * 0.32f, 16, t, 2.6f);
-            // avenida + carro
-            float ry = H - 26;
-            using (SolidBrush road = new SolidBrush(A(235, 14, 4, 30))) g.FillRectangle(road, 0, ry, W, 26);
-            using (Pen neon = new Pen(A(220, 255, 70, 160), 2f)) g.DrawLine(neon, 0, ry, W, ry);
-            using (Pen dash = new Pen(A(210, 255, 215, 90), 2f))
-            {
-                dash.DashPattern = new float[] { 6f, 8f };
-                dash.DashOffset = (float)(-t * 40);
-                g.DrawLine(dash, 0, ry + 13, W, ry + 13);
-            }
-            float carX = (float)((t * 70) % (W + 200)) - 100;
-            using (SolidBrush car = new SolidBrush(A(245, 8, 2, 18)))
-            {
-                g.FillRectangle(car, carX, ry - 11, 54, 10); g.FillRectangle(car, carX + 12, ry - 19, 28, 9);
-                g.FillEllipse(car, carX + 6, ry - 5, 11, 11); g.FillEllipse(car, carX + 36, ry - 5, 11, 11);
-            }
-            using (SolidBrush tl = new SolidBrush(A(240, 255, 50, 90))) g.FillRectangle(tl, carX - 1, ry - 9, 4, 3);
-            using (SolidBrush hl = new SolidBrush(A(90, 255, 235, 150))) g.FillPolygon(hl, new PointF[] { new PointF(carX + 54, ry - 9), new PointF(carX + 118, ry - 17), new PointF(carX + 118, ry - 1) });
+            using (Pen e = new Pen(A(230, 38, 20, 6), 1.2f)) g.DrawEllipse(e, cx - rh, cy - rh, 2 * rh, 2 * rh);
+            Bolt(g, cx, cy, Math.Max(2.4f, rh * 0.38f));
         }
-
-        // ---------------- Neon / Cyberpunk ----------------
-        static Color Mix(double u, int a)
+        static void GaugeR(Graphics g, float cx, float cy, float r, double v, string unit, bool nums)
         {
-            return A(a, (int)(0 + 255 * u), (int)(240 - 180 * u), (int)(255 - 35 * u));
-        }
-        static void Neon(Graphics g, Rectangle R, double t)
-        {
-            float W = R.Width, H = R.Height, hz = H * 0.66f, cx = W / 2f, sr = H * 0.17f;
-            using (LinearGradientBrush sb = new LinearGradientBrush(new RectangleF(cx - sr, hz - sr, sr * 2, sr * 2), A(80, 255, 60, 200), A(80, 255, 220, 0), 90f))
-                g.FillPie(sb, cx - sr, hz - sr, sr * 2, sr * 2, 180, 180);
-            using (Pen cut = new Pen(Xp.Face, 2f)) for (int k = 1; k <= 5; k++) { cut.Width = k * 0.8f; float y = hz - sr * 0.55f + k * sr * 0.1f; g.DrawLine(cut, cx - sr, y, cx + sr, y); }
-            using (Pen v = new Pen(A(70, 255, 60, 220), 1f)) for (int i = -14; i <= 14; i++) g.DrawLine(v, cx + i * 14, hz, cx + i * W / 7f, H);
-            double off = (t * 0.35) % 1.0;
-            using (Pen hp = new Pen(A(80, 0, 240, 255), 1f)) for (int k = 0; k < 10; k++) { double u = (k + off) / 10.0; float y = hz + (H - hz) * (float)(u * u); g.DrawLine(hp, 0, y, W, y); }
-            using (Pen hz1 = new Pen(A(180, 0, 240, 255), 2f)) g.DrawLine(hz1, 0, hz, W, hz);
-            // varredura
-            float bx = (float)((t * 90) % (W + 240)) - 120;
-            for (int k = -10; k <= 10; k++) using (Pen bp = new Pen(A(34 - Math.Abs(k) * 3, 0, 240, 255), 3f)) g.DrawLine(bp, bx + k * 3, 0, bx + k * 3, H);
-            // equalizador
-            int nb = Math.Max(10, (int)(W / 18));
-            using (SolidBrush eb = new SolidBrush(Color.Black))
-                for (int i = 0; i < nb; i++)
-                {
-                    double hh = 0.5 + 0.5 * Math.Sin(t * 3.2 + i * 0.7) * Math.Sin(t * 1.3 + i * 0.31);
-                    float bh = (float)(8 + hh * H * 0.12);
-                    eb.Color = Mix((double)i / nb, 90);
-                    g.FillRectangle(eb, i * 18 + 6, H - 12 - bh, 12, bh);
-                }
-            // fitas de LED (borda)
-            using (SolidBrush lb = new SolidBrush(Color.Black))
+            using (SolidBrush sh = new SolidBrush(A(100, 0, 0, 0))) g.FillEllipse(sh, cx - r + 5, cy - r + 7, 2 * r, 2 * r);
+            RectangleF rb = new RectangleF(cx - r, cy - r, 2 * r, 2 * r);
+            using (LinearGradientBrush lb = new LinearGradientBrush(rb, Hex(0xf6dc96), Hex(0x6b4410), 45f))
             {
-                for (float x = 6; x < W - 6; x += 12)
+                ColorBlend cb = new ColorBlend(4);
+                cb.Positions = new float[] { 0f, 0.3f, 0.6f, 1f };
+                cb.Colors = new Color[] { Hex(0xfbe9b0), Hex(0xc99a3c), Hex(0x7a5416), Hex(0xd8aa50) };
+                lb.InterpolationColors = cb;
+                g.FillEllipse(lb, rb);
+            }
+            using (Pen e = new Pen(A(230, 38, 20, 6), 1.5f)) g.DrawEllipse(e, rb.X, rb.Y, rb.Width, rb.Height);
+            float r2 = r * 0.86f, r3 = r * 0.8f;
+            using (SolidBrush d = new SolidBrush(Hex(0x2a1708))) g.FillEllipse(d, cx - r2, cy - r2, 2 * r2, 2 * r2);
+            using (GraphicsPath fp = new GraphicsPath())
+            {
+                fp.AddEllipse(cx - r3, cy - r3, 2 * r3, 2 * r3);
+                using (PathGradientBrush pb = new PathGradientBrush(fp))
                 {
-                    double ph = 0.5 + 0.5 * Math.Sin(x * 0.03 - t * 4);
-                    lb.Color = Mix(0.5 + 0.5 * Math.Sin(x * 0.008 + t * 0.8), 40 + (int)(200 * ph * ph));
-                    g.FillRectangle(lb, x, 2, 8, 4); g.FillRectangle(lb, x, H - 6, 8, 4);
+                    pb.CenterColor = Hex(0xf9efd0); pb.SurroundColors = new Color[] { Hex(0xc2a972) };
+                    g.FillPath(pb, fp);
                 }
-                for (float y = 10; y < H - 10; y += 12)
+            }
+            using (Pen rz = new Pen(A(210, 176, 32, 22), r * 0.07f)) g.DrawArc(rz, cx - r * 0.7f, cy - r * 0.7f, r * 1.4f, r * 1.4f, 135 + 27 * 8, 54);
+            for (int i = 0; i <= 40; i++)
+            {
+                double a = (135 + i * 6.75) * Math.PI / 180;
+                bool major = i % 4 == 0;
+                float r1 = r * 0.76f, rt = r * (major ? 0.62f : 0.69f);
+                using (Pen tk = new Pen(A(240, 50, 28, 10), major ? Math.Max(1.4f, r * 0.03f) : 1f))
+                    g.DrawLine(tk, cx + (float)(Math.Cos(a) * r1), cy + (float)(Math.Sin(a) * r1), cx + (float)(Math.Cos(a) * rt), cy + (float)(Math.Sin(a) * rt));
+            }
+            if (nums)
+                using (Font f = new Font("Georgia", Math.Max(6f, r * 0.15f), FontStyle.Bold, GraphicsUnit.Pixel))
+                using (SolidBrush tb = new SolidBrush(Hex(0x3a200a)))
+                using (StringFormat sf = new StringFormat())
                 {
-                    double ph = 0.5 + 0.5 * Math.Sin(y * 0.03 + t * 4);
-                    lb.Color = Mix(0.5 + 0.5 * Math.Sin(y * 0.008 + t * 0.8), 40 + (int)(200 * ph * ph));
-                    g.FillRectangle(lb, 2, y, 4, 8); g.FillRectangle(lb, W - 6, y, 4, 8);
-                }
-                // matriz de LEDs piscando
-                for (int i = 0; i < 8; i++)
-                    for (int j = 0; j < 4; j++)
+                    sf.Alignment = StringAlignment.Center; sf.LineAlignment = StringAlignment.Center;
+                    for (int i = 0; i <= 10; i += 2)
                     {
-                        double ph = 0.5 + 0.5 * Math.Sin(t * (1.5 + (i * 7 + j * 3) % 5 * 0.6) + i * 2.1 + j);
-                        lb.Color = ((i + j) % 2 == 0) ? A(30 + (int)(190 * ph), 0, 255, 160) : A(30 + (int)(190 * ph), 255, 60, 200);
-                        g.FillEllipse(lb, W - 150 + i * 16, 22 + j * 16, 7, 7);
+                        double a = (135 + i * 27) * Math.PI / 180;
+                        g.DrawString((i * 10).ToString(), f, tb, cx + (float)(Math.Cos(a) * r * 0.48), cy + (float)(Math.Sin(a) * r * 0.48), sf);
                     }
+                }
+            using (Font f2 = new Font("Georgia", Math.Max(6f, r * 0.12f), FontStyle.Italic, GraphicsUnit.Pixel))
+            using (SolidBrush tb2 = new SolidBrush(Hex(0x4a2c10)))
+            using (StringFormat sf2 = new StringFormat())
+            {
+                sf2.Alignment = StringAlignment.Center; sf2.LineAlignment = StringAlignment.Center;
+                g.DrawString(unit, f2, tb2, cx, cy + r * 0.3f, sf2);
             }
-            // anel pulsante
-            double pr = (t * 0.5) % 1.0;
-            using (Pen rp = new Pen(A((int)(120 * (1 - pr)), 255, 60, 220), 2f)) g.DrawEllipse(rp, W * 0.2f - (float)(pr * 90), H * 0.25f - (float)(pr * 90), (float)(pr * 180), (float)(pr * 180));
+            double na = (135 + v * 270) * Math.PI / 180;
+            float cs = (float)Math.Cos(na), sn = (float)Math.Sin(na);
+            PointF tip = new PointF(cx + cs * r * 0.7f, cy + sn * r * 0.7f), tail = new PointF(cx - cs * r * 0.2f, cy - sn * r * 0.2f);
+            PointF b1 = new PointF(cx - sn * r * 0.05f, cy + cs * r * 0.05f), b2 = new PointF(cx + sn * r * 0.05f, cy - cs * r * 0.05f);
+            using (SolidBrush ns = new SolidBrush(A(110, 0, 0, 0))) g.FillPolygon(ns, new PointF[] { new PointF(tip.X + 2, tip.Y + 3), new PointF(b1.X + 2, b1.Y + 3), new PointF(tail.X + 2, tail.Y + 3), new PointF(b2.X + 2, b2.Y + 3) });
+            using (SolidBrush nb = new SolidBrush(Hex(0x8a1a10))) g.FillPolygon(nb, new PointF[] { tip, b1, tail, b2 });
+            using (GraphicsPath hp = new GraphicsPath())
+            {
+                float hr = r * 0.09f;
+                hp.AddEllipse(cx - hr, cy - hr, 2 * hr, 2 * hr);
+                using (PathGradientBrush pb = new PathGradientBrush(hp)) { pb.CenterColor = Hex(0xfbe9b0); pb.SurroundColors = new Color[] { Hex(0x6a4510) }; g.FillPath(pb, hp); }
+            }
+            using (LinearGradientBrush gl = new LinearGradientBrush(new RectangleF(cx - r * 0.72f, cy - r * 0.8f, r * 1.1f, r * 0.9f), A(120, 255, 255, 255), A(0, 255, 255, 255), 90f))
+                g.FillEllipse(gl, cx - r * 0.72f, cy - r * 0.8f, r * 1.1f, r * 0.9f);
+            for (int k = 0; k < 4; k++)
+            {
+                double a = (45 + 90 * k) * Math.PI / 180;
+                Bolt(g, cx + (float)Math.Cos(a) * r * 0.93f, cy + (float)Math.Sin(a) * r * 0.93f, Math.Max(1.6f, r * 0.045f));
+            }
+        }
+        static void Valve(Graphics g, float cx, float cy, float r)
+        {
+            using (SolidBrush sh = new SolidBrush(A(90, 0, 0, 0))) g.FillEllipse(sh, cx - r + 4, cy - r + 6, 2 * r, 2 * r);
+            for (int k = 0; k < 3; k++)
+            {
+                double a = k * Math.PI / 3;
+                float dx = (float)Math.Cos(a) * r, dy = (float)Math.Sin(a) * r;
+                using (Pen p = new Pen(Hex(0x6a1610), r * 0.14f)) g.DrawLine(p, cx - dx, cy - dy, cx + dx, cy + dy);
+                using (Pen p = new Pen(Hex(0xc03a28), r * 0.06f)) g.DrawLine(p, cx - dx - 1, cy - dy - 1, cx + dx - 1, cy + dy - 1);
+            }
+            using (Pen p = new Pen(Hex(0x6a1610), r * 0.17f)) g.DrawEllipse(p, cx - r, cy - r, 2 * r, 2 * r);
+            using (Pen p = new Pen(Hex(0xd24a34), r * 0.07f)) g.DrawEllipse(p, cx - r - 1, cy - r - 1, 2 * r, 2 * r);
+            Bolt(g, cx, cy, r * 0.16f);
+        }
+        static void Puff(Graphics g, float cx, float cy, float r, int a)
+        {
+            using (GraphicsPath gp = new GraphicsPath())
+            {
+                gp.AddEllipse(cx - r, cy - r, 2 * r, 2 * r);
+                using (PathGradientBrush pb = new PathGradientBrush(gp))
+                {
+                    pb.CenterColor = A(a, 255, 250, 240); pb.SurroundColors = new Color[] { A(0, 255, 250, 240) };
+                    g.FillPath(pb, gp);
+                }
+            }
         }
 
+        // tubos usados como divisorias dos menus (tema Steampunk)
+        public static void HPipe(Graphics g, float x1, float x2, float y, float th)
+        {
+            PipeLine(g, x1, y, x2, y, th);
+            Collar(g, x1 + 3, y, 7, th, false);
+            Collar(g, x2 - 3, y, 7, th, false);
+            Collar(g, (x1 + x2) / 2, y, 8, th, false);
+        }
+        public static void VPipe(Graphics g, float x, float y1, float y2, float th)
+        {
+            PipeLine(g, x, y1, x, y2, th);
+            for (float y = y1 + 40; y < y2 - 10; y += 150) Collar(g, x, y, 7, th, true);
+        }
+        public static void GroupPipe(Graphics g, int w, int h)
+        {
+            using (GraphicsPath p = Xp.Round(new Rectangle(2, 10, w - 5, h - 13), 5))
+            {
+                using (Pen d = new Pen(A(255, 52, 26, 8), 5f)) g.DrawPath(d, p);
+                using (Pen m = new Pen(Hex(0xb5601f), 3.2f)) g.DrawPath(m, p);
+                g.TranslateTransform(-0.8f, -0.8f);
+                using (Pen l = new Pen(A(210, 246, 199, 154), 1f)) g.DrawPath(l, p);
+                g.TranslateTransform(0.8f, 0.8f);
+            }
+            Bolt(g, 3, 11, 2.6f); Bolt(g, w - 3, 11, 2.6f); Bolt(g, 3, h - 4, 2.6f); Bolt(g, w - 3, h - 4, 2.6f);
+        }
+
+        static Bitmap MakeSteam()
+        {
+            const int W = 1000, H = 700;
+            Bitmap b = new Bitmap(W, H, PixelFormat.Format32bppPArgb);
+            Random r = new Random(5);
+            using (Graphics g = Graphics.FromImage(b))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                // parede de madeira escura com rebites
+                using (LinearGradientBrush wall = new LinearGradientBrush(new Rectangle(0, 0, W, H), Hex(0x3b2515), Hex(0x1e1209), 90f)) g.FillRectangle(wall, 0, 0, W, H);
+                for (int i = 0; i < 700; i++)
+                {
+                    int x = r.Next(W), y = r.Next(H), l = r.Next(20, 120);
+                    using (Pen p = new Pen(A(r.Next(8, 22), r.Next(2) == 0 ? 0 : 255, r.Next(2) == 0 ? 0 : 200, 120), 1f)) g.DrawLine(p, x, y, x + l, y);
+                }
+                for (int x = 0; x < W; x += 96)
+                {
+                    using (Pen p = new Pen(A(120, 0, 0, 0), 3f)) g.DrawLine(p, x, 0, x, H);
+                    using (Pen p = new Pen(A(40, 255, 210, 150), 1f)) g.DrawLine(p, x + 2, 0, x + 2, H);
+                    for (int y = 40; y < H; y += 120) Bolt(g, x + 48, y, 3.2f);
+                }
+                Color gl = Hex(0xd7a75a), gd = Hex(0x4a2c0c);
+                // engrenagens de fundo
+                GearR(g, 90, 112, 78, 14, 0.2, gl, gd);
+                GearR(g, 210, 190, 50, 10, 0.55, gl, gd);
+                GearR(g, 862, 98, 70, 13, 0.1, gl, gd);
+                GearR(g, 936, 212, 42, 9, 0.4, gl, gd);
+                GearR(g, 60, 546, 66, 12, 0.3, gl, gd);
+                GearR(g, 160, 630, 40, 9, 0.7, gl, gd);
+                GearR(g, 500, 650, 56, 11, 0.15, gl, gd);
+                // tubulacao
+                PipeLine(g, -10, 49, W + 10, 49, 16);
+                for (int x = 70; x < W; x += 230) Collar(g, x, 49, 12, 16, false);
+                PipeLine(g, -10, 294, W + 10, 294, 28);
+                for (int x = 60; x < W; x += 210) Collar(g, x, 294, 14, 28, false);
+                PipeLine(g, 620, 294, 620, H + 10, 24);
+                Collar(g, 620, 430, 12, 24, true); Collar(g, 620, 575, 12, 24, true);
+                PipeLine(g, 140, -10, 140, 294, 20);
+                Collar(g, 140, 120, 12, 20, true); Collar(g, 140, 220, 12, 20, true);
+                Joint(g, 140, 294, 24); Joint(g, 620, 294, 26);
+                PipeLine(g, -10, 640, 380, 640, 18);
+                PipeArc(g, 380, 600, 40, 0, 90, 18);
+                PipeLine(g, 420, 600, 420, 470, 18);
+                Collar(g, 420, 470, 12, 18, true); Collar(g, 120, 640, 12, 18, false); Collar(g, 260, 640, 12, 18, false);
+                // verdigris nas juntas
+                for (int i = 0; i < 70; i++)
+                {
+                    float x = 40 + r.Next(W - 80), y = i % 2 == 0 ? 294 + r.Next(-12, 13) : 49 + r.Next(-6, 7);
+                    using (SolidBrush v = new SolidBrush(A(r.Next(25, 55), 70, 170, 140))) g.FillEllipse(v, x, y, r.Next(3, 9), r.Next(2, 5));
+                }
+                // manometros ligados por derivacoes
+                PipeLine(g, 720, 300, 720, 356, 10); GaugeR(g, 720, 408, 52, 0.62, "PSI", true);
+                PipeLine(g, 300, 640, 300, 566, 10); GaugeR(g, 300, 520, 44, 0.35, "BAR", true);
+                PipeLine(g, 100, 300, 100, 330, 9); GaugeR(g, 100, 366, 36, 0.78, "TEMP", false);
+                PipeLine(g, 500, 56, 500, 66, 9); GaugeR(g, 500, 108, 42, 0.5, "VAC", true);
+                // valvula com vapor
+                PipeLine(g, 860, 290, 860, 252, 8); Valve(g, 860, 232, 30);
+                Puff(g, 905, 200, 30, 70); Puff(g, 925, 160, 42, 55); Puff(g, 945, 112, 56, 40); Puff(g, 960, 56, 70, 28);
+                PipeLine(g, 380, 56, 380, 80, 8); Valve(g, 380, 104, 22);
+                // engrenagens da frente
+                GearR(g, 880, 590, 104, 16, 0.05, gl, gd);
+                GearR(g, 745, 660, 46, 10, 0.5, gl, gd);
+                // vinheta
+                using (GraphicsPath vp = new GraphicsPath())
+                {
+                    vp.AddRectangle(new Rectangle(0, 0, W, H));
+                    using (PathGradientBrush pb = new PathGradientBrush(vp))
+                    {
+                        pb.CenterColor = A(0, 0, 0, 0); pb.SurroundColors = new Color[] { A(150, 0, 0, 0) };
+                        pb.FocusScales = new PointF(0.6f, 0.6f);
+                        g.FillRectangle(pb, 0, 0, W, H);
+                    }
+                }
+            }
+            return b;
+        }
     }
 
     // ------------------------------------------------------------------
