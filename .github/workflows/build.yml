@@ -31,7 +31,9 @@ jobs:
             </ItemGroup>
           </Project>
           '@ | Set-Content -Path lhm/lhm.csproj -Encoding utf8
-          dotnet build lhm/lhm.csproj -c Release -o lhm/out
+          $b = dotnet build lhm/lhm.csproj -c Release -o lhm/out 2>&1
+          $b | Select-Object -Last 25 | ForEach-Object { Write-Host "::notice::$_" }
+          Get-ChildItem lhm/out -Recurse -ErrorAction SilentlyContinue | ForEach-Object { Write-Host "::notice::OUT $($_.FullName)" }
           Get-ChildItem lhm/out -Filter *.dll | Where-Object { $_.Name -ne 'lhm.dll' } | ForEach-Object { Copy-Item $_.FullName libs/ -Force }
           Get-ChildItem libs
           if (-not (Test-Path libs/LibreHardwareMonitorLib.dll)) { Write-Host "::error::LibreHardwareMonitorLib.dll nao foi copiado"; exit 1 }
