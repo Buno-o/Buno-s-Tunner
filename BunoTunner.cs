@@ -357,6 +357,17 @@ namespace BunoTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "  Busca falhou (", "  Search failed (",
+            "Windows Update", "Windows Update",
+            "servidor padrao", "default server",
+            "Nao foi possivel consultar o Windows Update: ", "Could not query Windows Update: ",
+            "  O servico Windows Update esta desativado; ativando para esta operacao...", "  The Windows Update service is disabled; enabling it for this operation...",
+            "O servico Windows Update esta desativado.", "The Windows Update service is disabled.",
+            "Sem acesso ao servidor do Windows Update (internet, DNS, proxy ou firewall).", "No access to the Windows Update server (internet, DNS, proxy or firewall).",
+            "O servico Windows Update nao esta pronto; reinicie o Windows e tente de novo.", "The Windows Update service is not ready; restart Windows and try again.",
+            "Acesso negado; execute o programa como administrador.", "Access denied; run the program as administrator.",
+            "O servidor do Windows Update esta ocupado; tente em alguns minutos.", "The Windows Update server is busy; try again in a few minutes.",
+            "Erro: ", "Error: ",
             "Continuar?", "Continue?",
             "Atualizar drivers de todos os dispositivos", "Update drivers for all devices",
             "Analisa todos os dispositivos do PC e procura no Windows Update os drivers mais novos. Antes de instalar, cria um ponto de restauracao e confere a assinatura digital e o hash SHA-256 dos arquivos baixados; se algum estiver alterado, nada e instalado.", "Scans every device in the PC and looks for newer drivers on Windows Update. Before installing, it creates a restore point and checks the digital signature and SHA-256 hash of the downloaded files; if any is altered, nothing is installed.",
@@ -1776,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.20.0";
+        public const string Version = "v1.20.1";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -10509,6 +10520,38 @@ namespace BunoTunner
         static object New(string progId) { return Activator.CreateInstance(Type.GetTypeFromProgID(progId, true)); }
         static string S(object o) { return o == null ? "" : o.ToString().Trim(); }
 
+        // desembrulha a excecao do COM e traduz os codigos mais comuns do Windows Update
+        static string Why(Exception ex)
+        {
+            while (ex is TargetInvocationException && ex.InnerException != null) ex = ex.InnerException;
+            int hr = Marshal.GetHRForException(ex);
+            string hex = "0x" + hr.ToString("X8"), hint = "";
+            switch ((uint)hr)
+            {
+                case 0x80070422: hint = "O servico Windows Update esta desativado."; break;
+                case 0x8024402C: case 0x80072EE7: case 0x80072EFD: case 0x80072EE2: case 0x8024401C: hint = "Sem acesso ao servidor do Windows Update (internet, DNS, proxy ou firewall)."; break;
+                case 0x80240438: case 0x8024001E: hint = "O servico Windows Update nao esta pronto; reinicie o Windows e tente de novo."; break;
+                case 0x80070005: hint = "Acesso negado; execute o programa como administrador."; break;
+                case 0x80240024: hint = "O Windows Update nao tem drivers para oferecer."; break;
+                case 0x8024A105: case 0x80244022: case 0x80244010: hint = "O servidor do Windows Update esta ocupado; tente em alguns minutos."; break;
+            }
+            return ex.Message.Trim() + " (" + hex + ")" + (hint.Length > 0 ? " - " + hint : "");
+        }
+
+        // garante que o servico do Windows Update esteja ligado
+        static void EnsureWuService(Action<string> log)
+        {
+            int c;
+            string q = Proc.Run("sc.exe", "qc wuauserv", 15000, out c);
+            if (q.IndexOf("DISABLED", StringComparison.OrdinalIgnoreCase) >= 0 || q.IndexOf("DESATIVADO", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                log("  O servico Windows Update esta desativado; ativando para esta operacao...");
+                Proc.Run("sc.exe", "config wuauserv start= demand", 15000, out c);
+            }
+            Proc.Run("sc.exe", "start wuauserv", 15000, out c);
+            Proc.Run("sc.exe", "start bits", 15000, out c);
+        }
+
         static string LogPath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunoTunner_drivers.log"); } }
         static void ToFile(string s) { try { File.AppendAllText(LogPath, s + "\r\n", new UTF8Encoding(true)); } catch (Exception) { } }
 
@@ -10562,10 +10605,23 @@ namespace BunoTunner
                 Inventory(L);
 
                 L("2/6  Procurando drivers mais novos no Windows Update (pode levar alguns minutos)...");
+                EnsureWuService(L);
                 object session = New("Microsoft.Update.Session");
-                object searcher = Cm(session, "CreateUpdateSearcher");
-                try { Sp(searcher, "ServerSelection", 2); } catch (Exception) { }
-                object sr = Cm(searcher, "Search", "IsInstalled=0 and Type='Driver' and IsHidden=0");
+                object searcher = null, sr = null;
+                int[] servers = { 2, 0 };   // primeiro direto no Windows Update (Microsoft), depois o padrao do PC
+                string lastErr = "";
+                foreach (int sv in servers)
+                {
+                    try
+                    {
+                        searcher = Cm(session, "CreateUpdateSearcher");
+                        try { Sp(searcher, "ServerSelection", sv); } catch (Exception) { }
+                        sr = Cm(searcher, "Search", "IsInstalled=0 and Type='Driver' and IsHidden=0");
+                        break;
+                    }
+                    catch (Exception ex) { lastErr = Why(ex); L("  Busca falhou (" + (sv == 2 ? "Windows Update" : "servidor padrao") + "): " + lastErr); sr = null; }
+                }
+                if (sr == null) { result = "Nao foi possivel consultar o Windows Update: " + lastErr; L(result); done(result); return; }
                 object ups = Gp(sr, "Updates");
                 int n = Convert.ToInt32(Gp(ups, "Count"));
                 if (n == 0) { result = "Todos os drivers ja estao na versao mais nova oferecida pelo Windows Update."; L(result); done(result); return; }
@@ -10644,7 +10700,7 @@ namespace BunoTunner
             }
             catch (Exception ex)
             {
-                result = "Erro: " + ex.Message;
+                result = "Erro: " + Why(ex);
                 log(result); ToFile(result);
                 done(result);
             }

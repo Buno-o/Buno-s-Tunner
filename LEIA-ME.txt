@@ -264,3 +264,6 @@ CORRECOES v1.7.1
 === v1.20.0 ===
 - Otimizacoes do Windows: novo primeiro item "Atualizar drivers de todos os dispositivos". Analisa todos os dispositivos (WMI), procura no Windows Update os drivers mais novos, mostra a lista para confirmar, cria um ponto de restauracao, baixa, confere assinatura digital e hash SHA-256 de todos os arquivos baixados (se algum estiver alterado ou nao confiavel, aborta sem instalar) e so entao instala. Ha tambem "So verificar". O log com os SHA-256 fica em BunoTunner_drivers.log ao lado do .exe.
 - Observacao: usa somente drivers publicados no Windows Update; drivers que so existem no site do fabricante (alguns de GPU/chipset mais recentes) nao aparecem la.
+
+=== v1.20.1 ===
+- Atualizar drivers: mostra o erro real do Windows Update (codigo e explicacao, ex.: sem internet, servico desativado), liga o servico Windows Update se estiver desativado e tenta primeiro direto na Microsoft e depois no servidor padrao do PC.
