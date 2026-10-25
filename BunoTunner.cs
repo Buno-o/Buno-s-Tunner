@@ -1787,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.20.1";
+        public const string Version = "v1.20.2";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -10516,7 +10516,7 @@ namespace BunoTunner
     {
         static object Gp(object o, string n) { return o.GetType().InvokeMember(n, BindingFlags.GetProperty, null, o, null); }
         static void Sp(object o, string n, object v) { o.GetType().InvokeMember(n, BindingFlags.SetProperty, null, o, new object[] { v }); }
-        static object Cm(object o, string n, params object[] a) { return o.GetType().InvokeMember(n, BindingFlags.InvokeMethod, null, o, a); }
+        static object Cm(object o, string n, params object[] a) { return o.GetType().InvokeMember(n, BindingFlags.InvokeMethod | BindingFlags.GetProperty, null, o, a); }   // "Item" e propriedade indexada no COM
         static object New(string progId) { return Activator.CreateInstance(Type.GetTypeFromProgID(progId, true)); }
         static string S(object o) { return o == null ? "" : o.ToString().Trim(); }
 

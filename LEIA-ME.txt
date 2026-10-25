@@ -267,3 +267,6 @@ CORRECOES v1.7.1
 
 === v1.20.1 ===
 - Atualizar drivers: mostra o erro real do Windows Update (codigo e explicacao, ex.: sem internet, servico desativado), liga o servico Windows Update se estiver desativado e tenta primeiro direto na Microsoft e depois no servidor padrao do PC.
+
+=== v1.20.2 ===
+- Atualizar drivers: corrigido o erro "Membro nao encontrado" ao ler a lista de drivers encontrada no Windows Update.
