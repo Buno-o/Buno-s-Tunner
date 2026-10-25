@@ -247,3 +247,7 @@ CORRECOES v1.7.1
 
 === v1.18.2 ===
 - Temas sem animacao: Neon e GTA VI agora tem cenarios em pixel art (cidade com chuva e sol de neon; praia com palmeiras, sol e conversivel). Steampunk ganhou arte realista com tubos de cobre, manometros analogicos, valvulas e engrenagens; os tubos tambem fazem parte das divisorias dos menus e das caixas de grupo. Proporcoes da janela inalteradas.
+
+=== v1.18.3 ===
+- Temas Neon, GTA VI e Steampunk: fundo mais suave por tras dos textos (melhor contraste de leitura).
+- Steampunk (e os demais): a arte de fundo mantem a proporcao original (nao fica mais esticada/esmagada em janelas 4:3); o excesso e cortado de forma centralizada.

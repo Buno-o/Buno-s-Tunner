@@ -1721,7 +1721,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.18.2";
+        public const string Version = "v1.18.3";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -6461,8 +6461,11 @@ namespace BunosTunner
                 Rectangle R = f.ClientRectangle;
                 g.InterpolationMode = Xp.Theme == 4 ? InterpolationMode.HighQualityBilinear : InterpolationMode.NearestNeighbor;
                 g.PixelOffsetMode = PixelOffsetMode.Half;
-                g.DrawImage(sc, R, 0, 0, sc.Width, sc.Height, GraphicsUnit.Pixel);
-                int va = Xp.Theme == 3 ? 150 : Xp.Theme == 6 ? 185 : 95;
+                // proporcao original preservada: a imagem cobre a janela sem esticar (corta o excesso, centralizado)
+                double k = Math.Max(R.Width / (double)sc.Width, R.Height / (double)sc.Height);
+                int sw = Math.Min(sc.Width, (int)Math.Ceiling(R.Width / k)), sh = Math.Min(sc.Height, (int)Math.Ceiling(R.Height / k));
+                g.DrawImage(sc, R, (sc.Width - sw) / 2, (sc.Height - sh) / 2, sw, sh, GraphicsUnit.Pixel);
+                int va = Xp.Theme == 3 ? 212 : Xp.Theme == 6 ? 218 : 165;
                 using (SolidBrush veil = new SolidBrush(A(va, Xp.Face.R, Xp.Face.G, Xp.Face.B))) g.FillRectangle(veil, R);
             }
             catch (Exception) { }
