@@ -357,6 +357,47 @@ namespace BunoTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "Continuar?", "Continue?",
+            "Atualizar drivers de todos os dispositivos", "Update drivers for all devices",
+            "Analisa todos os dispositivos do PC e procura no Windows Update os drivers mais novos. Antes de instalar, cria um ponto de restauracao e confere a assinatura digital e o hash SHA-256 dos arquivos baixados; se algum estiver alterado, nada e instalado.", "Scans every device in the PC and looks for newer drivers on Windows Update. Before installing, it creates a restore point and checks the digital signature and SHA-256 hash of the downloaded files; if any is altered, nothing is installed.",
+            "Atualizar drivers", "Update drivers",
+            "So verificar", "Check only",
+            "Clique em 'Atualizar drivers' para analisar e instalar, ou em 'So verificar' para apenas listar o que esta desatualizado.", "Click 'Update drivers' to scan and install, or 'Check only' to just list what is outdated.",
+            "1/6  Analisando os dispositivos do sistema...", "1/6  Scanning the system's devices...",
+            "2/6  Procurando drivers mais novos no Windows Update (pode levar alguns minutos)...", "2/6  Looking for newer drivers on Windows Update (may take a few minutes)...",
+            "3/6  Criando ponto de restauracao do sistema...", "3/6  Creating a system restore point...",
+            "4/6  Baixando os drivers...", "4/6  Downloading the drivers...",
+            "5/6  Verificando assinatura digital e hash SHA-256 dos arquivos baixados...", "5/6  Checking digital signature and SHA-256 hash of the downloaded files...",
+            "6/6  Instalando...", "6/6  Installing...",
+            "Dispositivos com driver: ", "Devices with a driver: ",
+            "   sem assinatura: ", "   unsigned: ",
+            "   com problema: ", "   with problems: ",
+            "  Sem assinatura: ", "  Unsigned: ",
+            "  Com problema (codigo ", "  Problem (code ",
+            "  Ponto de restauracao criado.", "  Restore point created.",
+            "  Nao foi possivel criar o ponto de restauracao (", "  Could not create the restore point (",
+            "). Continuando.", "). Continuing.",
+            "Encontrados: ", "Found: ",
+            " driver(s) mais novo(s).", " newer driver(s).",
+            "Todos os drivers ja estao na versao mais nova oferecida pelo Windows Update.", "All drivers are already at the newest version offered by Windows Update.",
+            "Verificacao concluida: ", "Check finished: ",
+            " driver(s) podem ser atualizados.", " driver(s) can be updated.",
+            "Cancelado pelo usuario. Nada foi instalado.", "Cancelled by the user. Nothing was installed.",
+            "Falha no download (codigo ", "Download failed (code ",
+            "). Nada foi instalado.", "). Nothing was installed.",
+            "  Assinaturas validas: ", "  Valid signatures: ",
+            "   sem assinatura propria (verificados pelo Windows Update): ", "   without their own signature (verified by Windows Update): ",
+            "   alterados/nao confiaveis: ", "   altered/untrusted: ",
+            "ABORTADO: ", "ABORTED: ",
+            " arquivo(s) com hash/assinatura invalidos. Nada foi instalado.", " file(s) with invalid hash/signature. Nothing was installed.",
+            "  Instalado: ", "  Installed: ",
+            "  FALHOU (codigo ", "  FAILED (code ",
+            "Concluido: ", "Done: ",
+            " instalado(s), ", " installed, ",
+            " com falha.", " failed.",
+            " REINICIE o Windows para terminar.", " RESTART Windows to finish.",
+            "Estes drivers serao baixados, verificados (assinatura e hash SHA-256) e instalados:", "These drivers will be downloaded, verified (signature and SHA-256 hash) and installed:",
+            "Sera criado um ponto de restauracao antes. A tela pode piscar (driver de video) e pode ser preciso reiniciar o Windows.", "A restore point will be created first. The screen may flicker (video driver) and Windows may need to restart.",
             "Abrir BunoTunner", "Open BunoTunner",
             "Minimizar para a bandeja ao clicar no X", "Minimize to tray when clicking X",
             "Continua rodando na bandeja. Clique duas vezes no icone para abrir.", "Still running in the tray. Double-click the icon to open.",
@@ -1735,7 +1776,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.19.0";
+        public const string Version = "v1.20.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -10458,18 +10499,172 @@ namespace BunoTunner
     }
 
     // ------------------------------------------------------------------
+    //  Atualizacao de drivers: inventario (WMI) + Windows Update Agent (COM) com verificacao de assinatura e hash SHA-256
+    // ------------------------------------------------------------------
+    static class DriverUpdater
+    {
+        static object Gp(object o, string n) { return o.GetType().InvokeMember(n, BindingFlags.GetProperty, null, o, null); }
+        static void Sp(object o, string n, object v) { o.GetType().InvokeMember(n, BindingFlags.SetProperty, null, o, new object[] { v }); }
+        static object Cm(object o, string n, params object[] a) { return o.GetType().InvokeMember(n, BindingFlags.InvokeMethod, null, o, a); }
+        static object New(string progId) { return Activator.CreateInstance(Type.GetTypeFromProgID(progId, true)); }
+        static string S(object o) { return o == null ? "" : o.ToString().Trim(); }
+
+        static string LogPath { get { return Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BunoTunner_drivers.log"); } }
+        static void ToFile(string s) { try { File.AppendAllText(LogPath, s + "\r\n", new UTF8Encoding(true)); } catch (Exception) { } }
+
+        static string Ps(string script, int ms)
+        {
+            string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+            int c;
+            return Proc.Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, ms, out c);
+        }
+
+        // inventario: todos os dispositivos com driver e os que estao com problema
+        static void Inventory(Action<string> log)
+        {
+            int total = 0, unsigned = 0, bad = 0;
+            try
+            {
+                using (ManagementObjectSearcher s = new ManagementObjectSearcher("SELECT DeviceName, IsSigned FROM Win32_PnPSignedDriver WHERE DeviceName IS NOT NULL"))
+                    foreach (ManagementBaseObject o in s.Get())
+                    {
+                        total++;
+                        object sg = o["IsSigned"];
+                        if (sg is bool && !(bool)sg) { unsigned++; log("  Sem assinatura: " + S(o["DeviceName"])); }
+                    }
+            }
+            catch (Exception ex) { log("  (inventario WMI falhou: " + ex.Message + ")"); }
+            try
+            {
+                using (ManagementObjectSearcher s = new ManagementObjectSearcher("SELECT Name, ConfigManagerErrorCode FROM Win32_PnPEntity WHERE ConfigManagerErrorCode <> 0"))
+                    foreach (ManagementBaseObject o in s.Get())
+                    {
+                        bad++;
+                        log("  Com problema (codigo " + S(o["ConfigManagerErrorCode"]) + "): " + S(o["Name"]));
+                    }
+            }
+            catch (Exception) { }
+            log("Dispositivos com driver: " + total + "   sem assinatura: " + unsigned + "   com problema: " + bad);
+        }
+
+        public class Found { public object Upd; public string Title, Maker, Cls, Date; }
+
+        // Retorna true se terminou (ou se nao havia nada); confirm(lista) decide se instala
+        public static void Run(bool install, Action<string> log, Func<string, bool> confirm, Action<string> done)
+        {
+            string result = "";
+            try
+            {
+                DateTime started = DateTime.Now;
+                ToFile("=== " + started.ToString("yyyy-MM-dd HH:mm:ss") + " ===");
+                Action<string> L = delegate(string s) { ToFile(s); log(s); };
+                L("1/6  Analisando os dispositivos do sistema...");
+                Inventory(L);
+
+                L("2/6  Procurando drivers mais novos no Windows Update (pode levar alguns minutos)...");
+                object session = New("Microsoft.Update.Session");
+                object searcher = Cm(session, "CreateUpdateSearcher");
+                try { Sp(searcher, "ServerSelection", 2); } catch (Exception) { }
+                object sr = Cm(searcher, "Search", "IsInstalled=0 and Type='Driver' and IsHidden=0");
+                object ups = Gp(sr, "Updates");
+                int n = Convert.ToInt32(Gp(ups, "Count"));
+                if (n == 0) { result = "Todos os drivers ja estao na versao mais nova oferecida pelo Windows Update."; L(result); done(result); return; }
+
+                List<Found> list = new List<Found>();
+                StringBuilder sb = new StringBuilder();
+                for (int i = 0; i < n; i++)
+                {
+                    object u = Cm(ups, "Item", i);
+                    Found f = new Found(); f.Upd = u; f.Title = S(Gp(u, "Title")); f.Maker = S(Gp(u, "DriverManufacturer")); f.Cls = S(Gp(u, "DriverClass"));
+                    try { f.Date = Convert.ToDateTime(Gp(u, "DriverVerDate")).ToString("yyyy-MM-dd"); } catch (Exception) { f.Date = ""; }
+                    list.Add(f);
+                    string line = "  " + f.Title + (f.Date.Length > 0 ? "  [" + f.Date + "]" : "");
+                    L(line); sb.AppendLine("- " + f.Title + (f.Date.Length > 0 ? " (" + f.Date + ")" : ""));
+                }
+                L("Encontrados: " + n + " driver(s) mais novo(s).");
+                if (!install) { result = "Verificacao concluida: " + n + " driver(s) podem ser atualizados."; done(result); return; }
+
+                if (!confirm(sb.ToString())) { result = "Cancelado pelo usuario. Nada foi instalado."; L(result); done(result); return; }
+
+                L("3/6  Criando ponto de restauracao do sistema...");
+                string rp = Ps("try { Checkpoint-Computer -Description 'BunoTunner - antes de atualizar drivers' -RestorePointType MODIFY_SETTINGS -ErrorAction Stop; 'OK' } catch { 'FALHA: ' + $_.Exception.Message }", 180000);
+                L(rp.Contains("OK") ? "  Ponto de restauracao criado." : "  Nao foi possivel criar o ponto de restauracao (" + (rp.Length > 120 ? rp.Substring(0, 120) : rp) + "). Continuando.");
+
+                L("4/6  Baixando os drivers...");
+                object coll = New("Microsoft.Update.UpdateColl");
+                foreach (Found f in list)
+                {
+                    try { if (!Convert.ToBoolean(Gp(f.Upd, "EulaAccepted"))) Cm(f.Upd, "AcceptEula"); } catch (Exception) { }
+                    Cm(coll, "Add", f.Upd);
+                }
+                object dl = Cm(session, "CreateUpdateDownloader");
+                Sp(dl, "Updates", coll);
+                object dr = Cm(dl, "Download");
+                int drc = Convert.ToInt32(Gp(dr, "ResultCode"));
+                if (drc != 2 && drc != 3) { result = "Falha no download (codigo " + drc + "). Nada foi instalado."; L(result); done(result); return; }
+
+                L("5/6  Verificando assinatura digital e hash SHA-256 dos arquivos baixados...");
+                string cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"SoftwareDistribution\Download");
+                string script = "$ErrorActionPreference='SilentlyContinue'; $t=[datetime]'" + started.AddSeconds(-5).ToString("yyyy-MM-dd HH:mm:ss") + "'; " +
+                    "Get-ChildItem -LiteralPath '" + cache + "' -Recurse -File | Where-Object { $_.LastWriteTime -ge $t } | ForEach-Object { " +
+                    "$s=(Get-AuthenticodeSignature -LiteralPath $_.FullName).Status.ToString(); $h=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash; $s+'|'+$h+'|'+$_.Name }";
+                string vout = Ps(script, 600000);
+                int ok = 0, tampered = 0, other = 0;
+                foreach (string ln in vout.Split('\n'))
+                {
+                    string[] p = ln.Trim().Split('|');
+                    if (p.Length < 3) continue;
+                    ToFile("  SHA256 " + p[1] + "  " + p[2] + "  assinatura: " + p[0]);
+                    if (p[0] == "Valid") ok++;
+                    else if (p[0] == "HashMismatch" || p[0] == "NotTrusted") { tampered++; L("  ALERTA: " + p[2] + " -> " + p[0]); }
+                    else other++;
+                }
+                L("  Assinaturas validas: " + ok + "   sem assinatura propria (verificados pelo Windows Update): " + other + "   alterados/nao confiaveis: " + tampered);
+                if (tampered > 0) { result = "ABORTADO: " + tampered + " arquivo(s) com hash/assinatura invalidos. Nada foi instalado."; L(result); done(result); return; }
+
+                L("6/6  Instalando...");
+                object inst = Cm(session, "CreateUpdateInstaller");
+                Sp(inst, "Updates", coll);
+                try { Sp(inst, "AllowSourcePrompts", false); } catch (Exception) { }
+                try { Sp(inst, "ForceQuiet", true); } catch (Exception) { }
+                object ir = Cm(inst, "Install");
+                int good = 0, fail = 0;
+                for (int i = 0; i < list.Count; i++)
+                {
+                    object ur = Cm(ir, "GetUpdateResult", i);
+                    int rc = Convert.ToInt32(Gp(ur, "ResultCode"));
+                    if (rc == 2 || rc == 3) { good++; L("  Instalado: " + list[i].Title); }
+                    else { fail++; L("  FALHOU (codigo " + rc + ", 0x" + Convert.ToInt32(Gp(ur, "HResult")).ToString("X8") + "): " + list[i].Title); }
+                }
+                bool reboot = false;
+                try { reboot = Convert.ToBoolean(Gp(ir, "RebootRequired")); } catch (Exception) { }
+                result = "Concluido: " + good + " instalado(s), " + fail + " com falha." + (reboot ? " REINICIE o Windows para terminar." : "");
+                L(result);
+                done(result);
+            }
+            catch (Exception ex)
+            {
+                result = "Erro: " + ex.Message;
+                log(result); ToFile(result);
+                done(result);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     //  Otimizacoes do Windows: limpeza de temporarios (CacheCleaner)
     // ------------------------------------------------------------------
     class OptPage : Panel
     {
         // cada otimizacao e uma linha padrao: titulo, descricao, botao principal (e opcional de desfazer) e o resultado
-        int row;
+        int top;
         Panel box = new Panel();
 
         public OptPage()
         {
             Dock = DockStyle.Fill;
             box.Dock = DockStyle.Fill; box.AutoScroll = true; Controls.Add(box);
+            AddDrivers();
             Add("Limpar arquivos temporarios", "Apaga C:\\Windows\\Temp, Prefetch e a pasta %temp% do usuario (itens em uso sao ignorados). Nenhum documento pessoal e tocado.",
                 "Limpar", delegate { return Clean(); }, null, null, null, null);
             Add("Desativar compressao de memoria", "Executa Disable-MMAgent -mc: o Windows deixa de comprimir a RAM (usa um pouco menos de CPU, um pouco mais de RAM). Vale apos reiniciar o PC.",
@@ -10509,6 +10704,55 @@ namespace BunoTunner
                 "Padrao do Windows", delegate { Del(true, MmKey, "FeatureSettingsOverride"); Del(true, MmKey, "FeatureSettingsOverrideMask"); Del(true, @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Virtualization", "MinVmVersionForCpuBasedMitigations"); return "Mitigacoes restauradas ao padrao do Windows. Reinicie o PC."; },
                 delegate { object v = Get(true, MmKey, "FeatureSettingsOverride"); return v != null ? "Estado: personalizado (FeatureSettingsOverride=" + v + ")" : "Estado: padrao do Windows (mitigacoes ativas)"; },
                 "ATENCAO: desativar as mitigacoes de Spectre/Meltdown deixa o PC mais vulneravel a ataques que leem memoria (por exemplo, por codigo malicioso no navegador). O ganho de desempenho costuma ser pequeno em CPUs recentes.\n\nDesativar mesmo assim?");
+        }
+
+        // primeiro item da lista: atualiza os drivers de todos os dispositivos
+        void AddDrivers()
+        {
+            XpGroup g = new XpGroup(); g.Title = "Atualizar drivers de todos os dispositivos"; g.SetBounds(0, 0, 650, 246);
+            Label d = UI.Lbl(g, "Analisa todos os dispositivos do PC e procura no Windows Update os drivers mais novos. Antes de instalar, cria um ponto de restauracao e confere a assinatura digital e o hash SHA-256 dos arquivos baixados; se algum estiver alterado, nada e instalado.", 12, 22, Xp.Ui, Xp.Dim);
+            d.AutoSize = false; d.SetBounds(12, 22, 500, 44);
+            XpButton bGo = UI.Btn(g, "Atualizar drivers", 524, 22, 112, null);
+            XpButton bScan = UI.Btn(g, "So verificar", 524, 50, 112, null);
+            bGo.Height = 24;
+            XpProgress pb = new XpProgress(); pb.SetBounds(12, 72, 624, 14); g.Controls.Add(pb);
+            TextBox log = new TextBox(); log.Multiline = true; log.ReadOnly = true; log.ScrollBars = ScrollBars.Vertical; log.WordWrap = true;
+            log.Font = Xp.Ui; log.BackColor = Xp.EditBg; log.ForeColor = Xp.Text; log.SetBounds(12, 92, 624, 144);
+            log.Text = "Clique em 'Atualizar drivers' para analisar e instalar, ou em 'So verificar' para apenas listar o que esta desatualizado.";
+            g.Controls.Add(log);
+            Timer anim = new Timer(); anim.Interval = 60; anim.Tick += delegate { pb.Step(); };
+            Action<bool> start = delegate(bool install)
+            {
+                bGo.Enabled = false; bScan.Enabled = false; pb.Marquee = true; anim.Start(); log.Text = "";
+                Action<string> add = delegate(string s) { try { BeginInvoke(new Action(delegate { log.AppendText(Lang.T(s) + "\r\n"); })); } catch (Exception) { } };
+                System.Threading.ThreadPool.QueueUserWorkItem(delegate
+                {
+                    DriverUpdater.Run(install, add,
+                        delegate(string lst)
+                        {
+                            bool yes = false;
+                            try
+                            {
+                                Invoke(new Action(delegate
+                                {
+                                    yes = Dlg.Show(this, "Estes drivers serao baixados, verificados (assinatura e hash SHA-256) e instalados:\n\n" + lst +
+                                        "\nSera criado um ponto de restauracao antes. A tela pode piscar (driver de video) e pode ser preciso reiniciar o Windows.\n\nContinuar?",
+                                        "BunoTunner - Otimizacoes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) == DialogResult.OK;
+                                }));
+                            }
+                            catch (Exception) { }
+                            return yes;
+                        },
+                        delegate(string r)
+                        {
+                            try { BeginInvoke(new Action(delegate { anim.Stop(); pb.Marquee = false; pb.Value = 0; pb.Invalidate(); bGo.Enabled = true; bScan.Enabled = true; })); } catch (Exception) { }
+                        });
+                });
+            };
+            bGo.Click += delegate { start(true); };
+            bScan.Click += delegate { start(false); };
+            box.Controls.Add(g);
+            top = 254;
         }
 
         static RegistryKey Root(bool machine) { return RegistryKey.OpenBaseKey(machine ? RegistryHive.LocalMachine : RegistryHive.CurrentUser, RegistryView.Registry64); }
@@ -10569,7 +10813,7 @@ namespace BunoTunner
 
         void Add(string title, string desc, string runText, Func<string> run, string undoText, Func<string> undo, Func<string> state, string confirm)
         {
-            XpGroup g = new XpGroup(); g.Title = title; g.SetBounds(0, row * 84, 650, 78); row++;
+            XpGroup g = new XpGroup(); g.Title = title; g.SetBounds(0, top, 650, 78); top += 84;
             Label d = UI.Lbl(g, desc, 12, 22, Xp.Ui, Xp.Dim);
             d.AutoSize = false; d.SetBounds(12, 22, 500, 32);
             Label st = UI.Lbl(g, "", 12, 56, Xp.Ui, Xp.GroupText);

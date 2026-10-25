@@ -260,3 +260,7 @@ CORRECOES v1.7.1
 === v1.19.0 ===
 - Aplicativo renomeado para BunoTunner (BunoTunner.exe, BunoTunner.cs, BunoTunner.ini; pastas de backup/log tambem). Se existir um BunosTunner.ini antigo ao lado do .exe, as configuracoes sao copiadas automaticamente.
 - Ao clicar no X, o programa minimiza para a bandeja do sistema e continua funcionando (ventoinhas, alertas, etc.). Duplo clique no icone da bandeja reabre; clique direito: Abrir / Sair e a opcao de ligar ou desligar esse comportamento do X.
+
+=== v1.20.0 ===
+- Otimizacoes do Windows: novo primeiro item "Atualizar drivers de todos os dispositivos". Analisa todos os dispositivos (WMI), procura no Windows Update os drivers mais novos, mostra a lista para confirmar, cria um ponto de restauracao, baixa, confere assinatura digital e hash SHA-256 de todos os arquivos baixados (se algum estiver alterado ou nao confiavel, aborta sem instalar) e so entao instala. Ha tambem "So verificar". O log com os SHA-256 fica em BunoTunner_drivers.log ao lado do .exe.
+- Observacao: usa somente drivers publicados no Windows Update; drivers que so existem no site do fabricante (alguns de GPU/chipset mais recentes) nao aparecem la.
