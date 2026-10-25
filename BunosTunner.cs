@@ -103,7 +103,7 @@ namespace BunosTunner
             using (Pen p = new Pen(Xp.CapFrame, 2)) g.DrawRectangle(p, 1, 1, Width - 3, Height - 3);
             using (Font f = new Font(Xp.Ui.FontFamily, 15f, FontStyle.Bold))
                 TextRenderer.DrawText(g, "Buno's Tunner", f, new Point(18, 14), Xp.Text);
-            TextRenderer.DrawText(g, "Carregando sensores e hardware...", Xp.Ui, new Point(20, 50), Xp.Text);
+            TextRenderer.DrawText(g, Lang.T("Carregando sensores e hardware..."), Xp.Ui, new Point(20, 50), Xp.Text);
             string st = Startup.Status ?? "";
             if (st.Length > 52) st = st.Substring(0, 52);
             TextRenderer.DrawText(g, st, Xp.Ui, new Point(20, 68), Xp.Dim);
@@ -115,13 +115,53 @@ namespace BunosTunner
     }
 
     // ------------------------------------------------------------------
-    //  Idiomas: padrao = idioma do Windows (portugues ou ingles); o texto original do programa e em portugues
+    //  Idiomas: padrao = idioma do Windows (portugues ou ingles); o texto original do programa e em portugues.
+    //  A traducao e feita por frases/trechos (do maior para o menor), so na hora de mostrar:
+    //  rotulos, botoes, titulos de janela, dicas, menus, listas, caixas de mensagem e textos que mudam durante o uso.
     // ------------------------------------------------------------------
+    class LTip : ToolTip
+    {
+        readonly Dictionary<Control, string> src = new Dictionary<Control, string>();
+        public LTip() { Lang.Tips.Add(this); }
+        public new void SetToolTip(Control c, string s)
+        {
+            if (c == null) return;
+            if (!src.ContainsKey(c)) { Control cc = c; c.Disposed += delegate { src.Remove(cc); }; }
+            src[c] = s;
+            base.SetToolTip(c, Lang.T(s));
+        }
+        public void Retranslate()
+        {
+            foreach (KeyValuePair<Control, string> kv in new List<KeyValuePair<Control, string>>(src)) base.SetToolTip(kv.Key, Lang.T(kv.Value));
+        }
+    }
+
+    // MessageBox com o texto/titulo traduzidos
+    static class Dlg
+    {
+        public static DialogResult Show(string text) { return MessageBox.Show(Lang.T(text)); }
+        public static DialogResult Show(string text, string caption) { return MessageBox.Show(Lang.T(text), Lang.T(caption)); }
+        public static DialogResult Show(string text, string caption, MessageBoxButtons b) { return MessageBox.Show(Lang.T(text), Lang.T(caption), b); }
+        public static DialogResult Show(string text, string caption, MessageBoxButtons b, MessageBoxIcon i) { return MessageBox.Show(Lang.T(text), Lang.T(caption), b, i); }
+        public static DialogResult Show(IWin32Window o, string text) { return MessageBox.Show(o, Lang.T(text)); }
+        public static DialogResult Show(IWin32Window o, string text, string caption) { return MessageBox.Show(o, Lang.T(text), Lang.T(caption)); }
+        public static DialogResult Show(IWin32Window o, string text, string caption, MessageBoxButtons b) { return MessageBox.Show(o, Lang.T(text), Lang.T(caption), b); }
+        public static DialogResult Show(IWin32Window o, string text, string caption, MessageBoxButtons b, MessageBoxIcon i) { return MessageBox.Show(o, Lang.T(text), Lang.T(caption), b, i); }
+    }
+
     static class Lang
     {
         public static int Cur;   // 0 = portugues, 1 = ingles
+        public static List<LTip> Tips = new List<LTip>();
+        public static event Action Changed;
         static Dictionary<string, string> en = new Dictionary<string, string>();
-        static Dictionary<object, string> orig = new Dictionary<object, string>();
+        static Dictionary<char, string[]> byFirst = new Dictionary<char, string[]>();
+        static Dictionary<string, string> cache = new Dictionary<string, string>();
+        static List<WeakReference> menus = new List<WeakReference>();
+        sealed class Holder { public string Src; public bool Hooked; }
+        static ConditionalWeakTable<object, Holder> hold = new ConditionalWeakTable<object, Holder>();
+        static bool busy;
+        static Timer sweeper;
         static readonly string[] Pairs = {
             "Placa de video:", "Graphics card:",
             "Tema:", "Theme:",
@@ -316,44 +356,1000 @@ namespace BunosTunner
             "Travar clock do nucleo (MHz):  min", "Lock core clock (MHz):  min",
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
+        static readonly string[] Pairs2 = {
+            "Erros: ", "Errors: ",
+            "FPS do render: ", "Render FPS: ",
+            "Pontos: ", "Score: ",
+            "Tempo: ", "Time: ",
+            " (restam ", " (remaining ",
+            "  Velocidade do link: ", "  Link speed: ",
+            "  blocos: ", "  blocks: ",
+            "  mascara ", "  mask ",
+            "  tempo: ", "  time: ",
+            "  ultimo: ", "  last: ",
+            "  (estimado)", "  (estimated)",
+            "  ATENCAO: ", "  WARNING: ",
+            "  AVISO: overclock pode causar travamentos e artefatos. Va aos poucos e teste a estabilidade.\n  Vale ate reiniciar ou clicar em Redefinir. Funciona em NVIDIA, AMD (Overdrive8) e Intel Arc.", "  WARNING: overclocking can cause crashes and artifacts. Go in small steps and test stability.\n  Lasts until reboot or until you click Reset. Works on NVIDIA, AMD (Overdrive8) and Intel Arc.",
+            "  CEP: ", "  ZIP: ",
+            "  Pontos CPU: ", "  CPU score: ",
+            "  Proximo teste em instantes...", "  Next test in a moment...",
+            "  Sequencia concluida.", "  Sequence finished.",
+            "  [driver le ", "  [driver reads ",
+            "  nenhum tipo PawnIO na DLL (DLL antiga: atualize a LibreHardwareMonitorLib.dll)", "  no PawnIO type in the DLL (old DLL: update LibreHardwareMonitorLib.dll)",
+            "  recurso ", "  feature ",
+            "  tipo ", "  type ",
+            "  |  Dica: em notebooks o fabricante (BIOS/vBIOS) pode bloquear o overclock; atualize o driver NVIDIA e tente valores menores. A secao \"Travar clock\" costuma funcionar mesmo assim.", "  |  Tip: on laptops the manufacturer (BIOS/vBIOS) may block overclocking; update the NVIDIA driver and try smaller values. The \"Lock clock\" section usually works anyway.",
+            "  |  pelos OpenGL", "  |  OpenGL fur",
+            "  |  shader + pelos OpenGL", "  |  shader + OpenGL fur",
+            " (BIOS legado / CSM)", " (legacy BIOS / CSM)",
+            " (BIOS legado ou sem suporte)", " (legacy BIOS or unsupported)",
+            " (Esc fecha e para)", " (Esc closes and stops)",
+            " (Polaris/Vega/antiga): ajuste de clocks so no AMD Adrenalin; a ventoinha funciona se o driver permitir", " (Polaris/Vega/older): clock tuning only in AMD Adrenalin; the fan works if the driver allows it",
+            " (Windows/driver sem suporte)", " (unsupported Windows/driver)",
+            " (agora / maximo)", " (now / max)",
+            " (aguardando reinicio)", " (waiting for reboot)",
+            " (confira se o ajuste manual esta liberado no AMD Adrenalin)", " (check that manual tuning is enabled in AMD Adrenalin)",
+            " (em execucao)", " (running)",
+            " (erro ", " (error ",
+            " (limite ", " (limit ",
+            " (sem TPM ou desativado no firmware)", " (no TPM or disabled in firmware)",
+            " (sequencia cancelada)", " (sequence cancelled)",
+            " (so leitura)", " (read-only)",
+            " CPUs marcados", " CPUs checked",
+            " Copias do registro em BunosTunner_backup.", " Registry copies in BunosTunner_backup.",
+            " MB liberados.", " MB freed.",
+            " MB/s | 4K aleatorio ", " MB/s | random 4K ",
+            " MB/s | Leitura seq ", " MB/s | Seq. read ",
+            " MHz     Memoria: ", " MHz     Memory: ",
+            " MHz reais", " real MHz",
+            " adaptador(es):", " adapter(s):",
+            " ainda nao foi configurado.\nEm breve!", " has not been set up yet.\nComing soon!",
+            " ajustada(s).", " adjusted.",
+            " alerta(s)", " alert(s)",
+            " arquivo(s) apagado(s), ", " file(s) deleted, ",
+            " arquivo(s) em uso serao apagados no proximo reinicio do Windows.", " file(s) in use will be deleted on the next Windows restart.",
+            " canais", " channels",
+            " canal(ais)).  ", " channel(s)).  ",
+            " canal(is) em ", " channel(s) at ",
+            " com falha.", " failed.",
+            " dias)", " days)",
+            " disco(s). Alguns discos USB/RAID nao informam S.M.A.R.T. ao Windows.", " disk(s). Some USB/RAID disks do not report S.M.A.R.T. to Windows.",
+            " do sistema ignorado(s)", " system item(s) skipped",
+            " durante o calculo (o driver pode ter reiniciado).", " during the calculation (the driver may have restarted).",
+            " e o CPU-Z não foi encontrado", " and CPU-Z was not found",
+            " e o CPU-Z não retornou dados", " and CPU-Z returned no data",
+            " erro 0x", " error 0x",
+            " erro(s) de calculo/verificacao - sistema instavel!", " calculation/verification error(s) - unstable system!",
+            " falhou (", " failed (",
+            " item(ns) encontrado(s). Revise a lista (so os de certeza alta vem marcados) e clique em 'Remover itens marcados'.", " item(s) found. Review the list (only high-certainty ones come checked) and click 'Remove checked items'.",
+            " item(ns) marcado(s)?\n\n", " checked item(s)?\n\n",
+            " item(ns) removido(s)", " item(s) removed",
+            " módulo(s))", " module(s))",
+            " no grafico  |  ", " on the graph  |  ",
+            " nucleos, ", " cores, ",
+            " processo(s) alterado(s)", " process(es) changed",
+            " processo(s) encerrado(s). Procurando restos...", " process(es) ended. Looking for leftovers...",
+            " processo(s) finalizado(s).", " process(es) ended.",
+            " programas. Escolha um na lista.", " programs. Choose one from the list.",
+            " rank(s) no total", " rank(s) in total",
+            " s   melhor: ", " s   best: ",
+            " sem RPM maximo medido: use \"Identificar\" antes.", " no measured max RPM: use \"Identify\" first.",
+            " sensores  |  ", " sensors  |  ",
+            " sensores)", " sensors)",
+            " ventoinha(s) aplicada(s). ", " fan(s) applied. ",
+            " ventoinha(s) do tipo \"", " fan(s) of type \"",
+            "% (a placa pode subir se esquentar)", "% (the card may go higher if it heats up)",
+            "% restante", "% remaining",
+            "(!) Os sensores da CPU nao estao sendo lidos pelo driver (temperatura/tensao/consumo). Clique aqui para ver como resolver.", "(!) CPU sensors are not being read by the driver (temperature/voltage/power). Click here to see how to fix it.",
+            "(indisponivel)", "(unavailable)",
+            "(interrompido)", "(interrupted)",
+            "(negado)", "(denied)",
+            "(use \"Identificar\" antes: ele mede o RPM maximo de cada ventoinha)", "(use \"Identify\" first: it measures each fan's max RPM)",
+            ") não expõe os timings sem um driver próprio", ") does not expose timings without its own driver",
+            ").\nAbrir o download no navegador?", ").\nOpen the download in the browser?",
+            "): usando o teste OpenCL.", "): using the OpenCL test.",
+            ")?\nTrabalho nao salvo nele sera perdido.", ")?\nUnsaved work in it will be lost.",
+            "- Botao direito: criar ALERTA (som), copiar nome/valor, zerar min/max.\n", "- Right-click: create an ALERT (sound), copy name/value, reset min/max.\n",
+            "- Cartoes no topo: os valores principais (GPU, CPU, RAM, ventoinha) sempre a vista.\n", "- Cards on top: the main values (GPU, CPU, RAM, fan) always in view.\n",
+            "- Exportar salva os valores/historico em CSV ou o grafico em PNG.", "- Export saves the values/history as CSV or the graph as PNG.",
+            "- Grafico: passe o mouse para ver os valores; \"Normalizar escala\" coloca unidades diferentes lado a lado.\n", "- Graph: hover to see the values; \"Normalize scale\" puts different units side by side.\n",
+            "- Lista: escolha a categoria a esquerda (GPU, CPU, Placa-mae, Memoria...) e use a busca (Ctrl+F) e o filtro de tipo.\n", "- List: choose the category on the left (GPU, CPU, Motherboard, Memory...) and use search (Ctrl+F) and the type filter.\n",
+            "- Marque a caixinha (ou de duplo clique) para ver o sensor no grafico.\n", "- Tick the checkbox (or double-click) to see the sensor on the graph.\n",
+            "- \"Atualizar a cada\" muda a velocidade das leituras (em milissegundos).\n", "- \"Update every\" changes the reading speed (in milliseconds).\n",
+            "- \"Essenciais\" marca os sensores mais importantes de uma vez.\n", "- \"Essentials\" ticks the most important sensors at once.\n",
+            "--- Adaptador: ", "--- Adapter: ",
+            "--- Ao vivo ---", "--- Live ---",
+            "--- Overclock / controle (", "--- Overclock / control (",
+            "--- Recursos (ligado / desligado) ---", "--- Features (on / off) ---",
+            "--- Recursos e seguranca (ligado / desligado) ---", "--- Features and security (on / off) ---",
+            ". Alternativa: baixe o CPU-Z (versão ZIP), extraia ao lado do programa ou use \"Indicar CPU-Z\"; o programa o usa só para ler os timings.", ". Alternative: download CPU-Z (ZIP version), extract it next to the program or use \"Set CPU-Z\"; the program only uses it to read the timings.",
+            ". Esta placa/driver nao aceitou controle manual.", ". This card/driver did not accept manual control.",
+            ". Use 'Remocao forcada' ou 'So procurar restos'.", ". Use 'Forced removal' or 'Only scan for leftovers'.",
+            "2a thread", "2nd thread",
+            "1) \"Integridade de memoria\" (Isolamento de nucleo) do Windows ou o Defender bloqueando o driver: desative em Seguranca do Windows > Seguranca do dispositivo > Isolamento de nucleo e reinicie o PC.\n", "1) Windows \"Memory integrity\" (Core isolation) or Defender blocking the driver: turn it off in Windows Security > Device security > Core isolation and restart the PC.\n",
+            "2) Versao do LibreHardwareMonitor antiga para a sua CPU: use a mais recente (versoes novas podem exigir o driver PawnIO).\n", "2) LibreHardwareMonitor version too old for your CPU: use the latest one (newer versions may require the PawnIO driver).\n",
+            "3) Antivirus de terceiros.\n\n", "3) Third-party antivirus.\n\n",
+            "; rode como administrador); ", "; run as administrator); ",
+            "=== Este computador ===", "=== This computer ===",
+            "=== Internet (visto de fora) ===", "=== Internet (seen from outside) ===",
+            "?  Como usar", "?  How to use",
+            "A placa Intel nao expoe controle de ventoinha.", "The Intel card does not expose fan control.",
+            "A placa-mae pode nao expor as ventoinhas ao Windows", "The motherboard may not expose the fans to Windows",
+            "A propria placa-mae ou o driver controla a velocidade pela temperatura.", "The motherboard or driver itself controls the speed based on temperature.",
+            "A ventoinha fica sempre na mesma velocidade, nao importa a temperatura.", "The fan always stays at the same speed, no matter the temperature.",
+            "ADL incompleta", "ADL incomplete",
+            "ADL sem Overdrive8", "ADL without Overdrive8",
+            "ADL sem Overdrive8_Setting_Set", "ADL without Overdrive8_Setting_Set",
+            "ADL2_Main_Control_Create erro ", "ADL2_Main_Control_Create error ",
+            "ALERTA: ", "ALERT: ",
+            "AMD (plataforma nao identificada)", "AMD (platform not identified)",
+            "ATENCAO: as informacoes a seguir sao PESSOAIS.\n\nVao aparecer seu IP interno e externo, enderecos MAC, provedor, cidade aproximada, nome da rede Wi-Fi e DNS.\nNao compartilhe prints desta tela.\n\nMostrar mesmo assim?", "WARNING: the following information is PERSONAL.\n\nYour internal and external IP, MAC addresses, ISP, approximate city, Wi-Fi network name and DNS will appear.\nDo not share screenshots of this screen.\n\nShow it anyway?",
+            "ATENCAO: desativar as mitigacoes de Spectre/Meltdown deixa o PC mais vulneravel a ataques que leem memoria (por exemplo, por codigo malicioso no navegador). O ganho de desempenho costuma ser pequeno em CPUs recentes.\n\nDesativar mesmo assim?", "WARNING: disabling Spectre/Meltdown mitigations makes the PC more vulnerable to attacks that read memory (for example, malicious code in the browser). The performance gain is usually small on recent CPUs.\n\nDisable anyway?",
+            "ATENCAO: o disco indica falha iminente ou pouca vida util. Faca backup AGORA e planeje a troca.", "WARNING: the disk reports imminent failure or little remaining life. Back up NOW and plan a replacement.",
+            "ATENCAO: ", "WARNING: ",
+            "Abaixo do normal", "Below normal",
+            "Aceleracao de GPU por hardware (HAGS)", "Hardware-accelerated GPU scheduling (HAGS)",
+            "Aceleracao do mouse ATIVADA.", "Mouse acceleration ENABLED.",
+            "Aceleracao do mouse DESATIVADA.", "Mouse acceleration DISABLED.",
+            "Acima do normal", "Above normal",
+            "AdapterInfo_Get falhou (", "AdapterInfo_Get failed (",
+            "Adicionado: ", "Added: ",
+            "Administrador: ", "Administrator: ",
+            "Alerta definido: ", "Alert set: ",
+            "Alerta removido.", "Alert removed.",
+            "Alerta", "Alert",
+            "Alta", "High",
+            "Aplicar tambem a TODOS os processos com o mesmo nome", "Also apply to ALL processes with the same name",
+            "Apoie o Buno's Tunner via LivePix", "Support Buno's Tunner via LivePix",
+            "Apoie o Buno's Tunner via PayPal", "Support Buno's Tunner via PayPal",
+            "Armazenamento (HD/SSD)", "Storage (HDD/SSD)",
+            "Armazenamento", "Storage",
+            "Arquitetura", "Architecture",
+            "Arquivo", "File",
+            "Atalho", "Shortcut",
+            "Ate parar", "Until stopped",
+            "Atencao", "Attention",
+            "Automatico", "Automatic",
+            "Avisar (som + barra de status) quando \"", "Notify (sound + status bar) when \"",
+            "Aviso", "Warning",
+            "Baixa (Idle)", "Low (Idle)",
+            "Baixar e instalar o PawnIO agora?\n\nO instalador oficial (github.com/namazso/PawnIO.Setup) sera baixado e pedira permissao de administrador.", "Download and install PawnIO now?\n\nThe official installer (github.com/namazso/PawnIO.Setup) will be downloaded and will ask for administrator permission.",
+            "Banda teórica: ", "Theoretical bandwidth: ",
+            "Barramento da memoria", "Memory bus",
+            "Bateria", "Battery",
+            "Boa", "Good",
+            "Bomba/AIO", "Pump/AIO",
+            "Boot em modo UEFI (necessario p/ ReBAR)", "UEFI boot mode (required for ReBAR)",
+            "Boot em modo UEFI", "UEFI boot mode",
+            "Buno's Tunner - Adicionar manualmente", "Buno's Tunner - Add manually",
+            "Buno's Tunner - Dados pessoais", "Buno's Tunner - Personal data",
+            "Buno's Tunner - Desinstalar", "Buno's Tunner - Uninstall",
+            "Buno's Tunner - Otimizacoes", "Buno's Tunner - Optimizations",
+            "Buno's Tunner - PawnIO recomendado", "Buno's Tunner - PawnIO recommended",
+            "Buno's Tunner - Remocao forcada", "Buno's Tunner - Forced removal",
+            "Buno's Tunner - Remover", "Buno's Tunner - Remove",
+            "Buno's Tunner - Render do teste (Esc fecha e para)", "Buno's Tunner - Test render (Esc closes and stops)",
+            "Buno's Tunner - Sensores (GPU, CPU, placa-mae, memoria, discos, ventoinhas...)", "Buno's Tunner - Sensors (GPU, CPU, motherboard, memory, disks, fans...)",
+            "Buno's Tunner - Sensores", "Buno's Tunner - Sensors",
+            "Buno's Tunner - diagnostico dos timings", "Buno's Tunner - timings diagnostics",
+            "Buno's Tunner - erro fatal", "Buno's Tunner - fatal error",
+            "Buno's Tunner - tempos da abertura (cada linha: tempo total, tempo desta etapa)\r\n", "Buno's Tunner - startup timings (each line: total time, time of this step)\r\n",
+            "COMO USAR OS SENSORES\n\n", "HOW TO USE THE SENSORS\n\n",
+            "CPU - consumo", "CPU - power",
+            "CPU - render 3D por blocos (ray tracing)", "CPU - block-based 3D render (ray tracing)",
+            "CPU - temperatura", "CPU - temperature",
+            "CPU - uso", "CPU - usage",
+            "Programas (*.exe)|*.exe|Todos|*.*", "Programs (*.exe)|*.exe|All|*.*",
+            "CPU-Z (cpuz*.exe)|cpuz*.exe|Programas|*.exe", "CPU-Z (cpuz*.exe)|cpuz*.exe|Programs|*.exe",
+            "Canais:", "Channels:",
+            "Cancelado.", "Cancelled.",
+            "Cancelado", "Cancelled",
+            "Capacidade total:", "Total capacity:",
+            "Capacidade", "Capacity",
+            "Carregando sensores e hardware...", "Loading sensors and hardware...",
+            "Causas comuns:\n", "Common causes:\n",
+            "Ciclos liga/desliga", "Power cycles",
+            "Cidade: ", "City: ",
+            "Clock atual (WMI)", "Current clock (WMI)",
+            "Clock base", "Base clock",
+            "Clock da memoria", "Memory clock",
+            "Clock de video", "Video clock",
+            "Clock do nucleo", "Core clock",
+            "Clock externo (BCLK)", "External clock (BCLK)",
+            "Clock maximo", "Max clock",
+            "Clock medio dos nucleos", "Average core clock",
+            "Clock travado.", "Clock locked.",
+            "Clocks atuais e suporte desta placa", "Current clocks and support of this card",
+            "Clocks destravados.", "Clocks unlocked.",
+            " (agora)", " (now)",
+            "Codigo ", "Code ",
+            "Coletando informacoes...", "Collecting information...",
+            "Compressao de memoria desativada. Reinicie o Windows para valer.", "Memory compression disabled. Restart Windows for it to take effect.",
+            "Compressao de memoria reativada. Reinicie o Windows para valer.", "Memory compression re-enabled. Restart Windows for it to take effect.",
+            "Concluido: ", "Done: ",
+            "Concluido.", "Done.",
+            "Concluido", "Done",
+            "Conjuntos de instrucoes", "Instruction sets",
+            "Consumo (watts)", "Power (watts)",
+            "Consumo do pacote", "Package power",
+            "Continuar", "Continue",
+            "ControlLib.dll nao encontrada (instale o driver Intel Arc / Graphics mais recente)", "ControlLib.dll not found (install the latest Intel Arc / Graphics driver)",
+            "Controlador embarcado", "Embedded controller",
+            "Controladora", "Controller",
+            "Controle (%)", "Control (%)",
+            "Controle automatico (curva original da placa) restaurado.", "Automatic control (card's original curve) restored.",
+            "Controle da ventoinha", "Fan control",
+            "Controle de ventoinha indisponivel.", "Fan control unavailable.",
+            "Copiado.", "Copied.",
+            "Copiar nome", "Copy name",
+            "Copiar valor", "Copy value",
+            "Corrente", "Current",
+            "Criando ponto de restauracao (pode levar um minuto)...", "Creating restore point (may take a minute)...",
+            "Crossbar / Uncore / Fabric clock: nenhuma API publica (NVML, NvAPI, ADL, IGCL) expoe esses clocks, entao nenhum programa de terceiros consegue altera-los.", "Crossbar / Uncore / Fabric clock: no public API (NVML, NvAPI, ADL, IGCL) exposes these clocks, so no third-party program can change them.",
+            "DDR5: cada módulo tem 2 subcanais de 32 bits.", "DDR5: each module has two 32-bit sub-channels.",
+            "DEP / NX (protecao de execucao)", "DEP / NX (execution protection)",
+            "Data do driver (registro)", "Driver date (registry)",
+            "Data do driver", "Driver date",
+            "Definir alerta (acima de...)", "Set alert (above...)",
+            "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o Buno's Tunner novamente.", "After downloading, run PawnIO_setup.exe (as administrator), finish the installation and open Buno's Tunner again.",
+            "Desativar o Isolamento de nucleo reduz a protecao contra malware que ataca o nucleo do Windows. Desativar mesmo assim?", "Disabling Core isolation reduces protection against malware that attacks the Windows kernel. Disable anyway?",
+            "Desconhecida", "Unknown",
+            "Descricao: ", "Description: ",
+            "Deseja abrir o download oficial agora?\n(Sim = baixa o PawnIO_setup.exe; Nao = continuar sem ele. Este aviso aparece a cada abertura enquanto ele nao estiver instalado.)", "Do you want to open the official download now?\n(Yes = downloads PawnIO_setup.exe; No = continue without it. This notice appears at every start while it is not installed.)",
+            "Desgaste (uso da vida util)", "Wear (life used)",
+            "Desinstalador aberto: conclua as telas dele... (a busca de restos comeca quando ele terminar)", "Uninstaller open: finish its screens... (the leftover search starts when it ends)",
+            "Desinstalador terminou.", "Uninstaller finished.",
+            "Desinstalar \"", "Uninstall \"",
+            "Desligado (1 thread por nucleo)", "Off (1 thread per core)",
+            "Desligado ou nao confirmado (BAR1 de 256 MB)", "Off or unconfirmed (256 MB BAR1)",
+            "Desligado", "Off",
+            "Dica: marque a caixinha (ou de duplo clique) para ver o sensor no grafico. Botao direito = alerta, copiar... Clique no cabecalho para ordenar.", "Tip: tick the checkbox (or double-click) to see the sensor on the graph. Right-click = alert, copy... Click the header to sort.",
+            "Digite parte do nome. Varias palavras = todas precisam aparecer (ex.: core temp). Ctrl+A seleciona tudo.", "Type part of the name. Several words = all must appear (e.g. core temp). Ctrl+A selects all.",
+            "Discos", "Disks",
+            "Driver SEM leitura da CPU (Integridade de memoria/Defender?) - usando zona termica do Windows", "Driver WITHOUT CPU reading (Memory integrity/Defender?) - using Windows thermal zone",
+            "Duracao", "Duration",
+            "ECC da memoria", "Memory ECC",
+            "Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "With 'Until stopped' the SSD receives continuous writes (causes wear). Continue?",
+            "Enquanto isso o programa usa as zonas termicas do Windows (menos precisas).\n\nAbrir agora a tela de Isolamento de nucleo?", "Meanwhile the program uses Windows thermal zones (less accurate).\n\nOpen the Core isolation screen now?",
+            "Erro ao executar ", "Error running ",
+            "Erro de escrita (", "Write error (",
+            "Erro de leitura (", "Read error (",
+            "Erro na busca: ", "Search error: ",
+            "Erro: ", "Error: ",
+            "Erros de escrita (total)", "Write errors (total)",
+            "Erros de leitura (total)", "Read errors (total)",
+            "Erros:", "Errors:",
+            "Escolha (ou salve) um preset antes de criar a regra.", "Choose (or save) a preset before creating the rule.",
+            "Escolha a pasta do programa", "Choose the program folder",
+            "Escolha o cpuz.exe (versao portatil ou instalada)", "Choose cpuz.exe (portable or installed version)",
+            "Escolha o que voce quer ver: GPU, CPU, placa-mae, memoria, discos, ventoinhas...", "Choose what you want to see: GPU, CPU, motherboard, memory, disks, fans...",
+            "Escolha um preset para carregar nucleos e prioridade; depois clique em \"Aplicar aos marcados\". \"Salvar atual\" guarda o que esta na grade.", "Choose a preset to load cores and priority; then click \"Apply to checked\". \"Save current\" stores what is in the grid.",
+            "Escrita seq ", "Seq. write ",
+            "Essa pasta e protegida pelo sistema e nao pode ser usada aqui:\n", "This folder is protected by the system and cannot be used here:\n",
+            "Esta placa AMD nao aceitou controle de ventoinha pelo ADL.", "This AMD card did not accept fan control through ADL.",
+            "Esta placa expoe todos os ajustes acima. ", "This card exposes all the settings above. ",
+            "Esta ventoinha e somente leitura.", "This fan is read-only.",
+            "Estabilidade", "Stability",
+            "Estado de desempenho", "Performance state",
+            "Estado informado pelo Windows", "State reported by Windows",
+            "Estado: ATIVADA", "State: ENABLED",
+            "Estado: ATIVADO", "State: ENABLED",
+            "Estado: DESATIVADA", "State: DISABLED",
+            "Estado: MPO DESATIVADO", "State: MPO DISABLED",
+            "Estado: MPO padrao (ativo)", "State: MPO default (active)",
+            "Estado: ativada", "State: enabled",
+            "Estado: compressao ATIVADA", "State: compression ENABLED",
+            "Estado: compressao DESATIVADA", "State: compression DISABLED",
+            "Estado: desativada", "State: disabled",
+            "Estado: desativado", "State: disabled",
+            "Estado: menu classico ATIVO", "State: classic menu ACTIVE",
+            "Estado: menu padrao do Windows 11", "State: Windows 11 default menu",
+            "Estado: overlay ATIVO", "State: overlay ACTIVE",
+            "Estado: overlay desligado", "State: overlay off",
+            "Estado: padrao do Windows (mitigacoes ativas)", "State: Windows default (mitigations active)",
+            "Estado: personalizado (FeatureSettingsOverride=", "State: custom (FeatureSettingsOverride=",
+            "Este item nao tem desinstalador. Use 'Remocao forcada'.", "This item has no uninstaller. Use 'Forced removal'.",
+            "Exclusivo", "Exclusive",
+            "Exportar", "Export",
+            "FALHOU - ", "FAILED - ",
+            "FALHOU", "FAILED",
+            "FPU - malha de ondas em ponto flutuante", "FPU - floating-point wave mesh",
+            "Faixa da ventoinha (driver)", "Fan range (driver)",
+            "Faixa de potencia permitida", "Allowed power range",
+            "Falha ao abrir o desinstalador: ", "Failed to open the uninstaller: ",
+            "Falha ao salvar: ", "Failed to save: ",
+            "Falhou (execute como administrador): ", "Failed (run as administrator): ",
+            "Falhou: Overdrive8 indisponivel", "Failed: Overdrive8 unavailable",
+            "Falhou: ctlFanSetFixedSpeedMode erro 0x", "Failed: ctlFanSetFixedSpeedMode error 0x",
+            "Falhou: funcao ausente", "Failed: function missing",
+            "Falhou: ", "Failed: ",
+            "Falhou", "Failed",
+            "Familia / modelo / stepping", "Family / model / stepping",
+            "Ventoinha (RPM agora)", "Fan (RPM now)",
+            "Ventoinha (% agora)", "Fan (% now)",
+            "Filtrar por tipo de medida (temperatura, uso, clock...)", "Filter by measurement type (temperature, usage, clock...)",
+            "Finaliza todos os programas abertos que rodam da pasta do programa selecionado (e para os servicos dele). Use antes de desinstalar se ele estiver aberto.", "Ends all open programs that run from the selected program's folder (and stops its services). Use before uninstalling if it is open.",
+            "Finalizando o teste anterior... tente de novo em um instante.", "Ending the previous test... try again in a moment.",
+            "Finalizar todos os processos de \"", "End all processes of \"",
+            "Fonte: ", "Source: ",
+            "Fonte", "Source",
+            "Fuso horario: ", "Time zone: ",
+            "GPU nao encontrada", "GPU not found",
+            "GPU - consumo", "GPU - power",
+            "GPU - render 3D de pelos (OpenGL)", "GPU - 3D fur render (OpenGL)",
+            "GPU - temperatura", "GPU - temperature",
+            "GPU - uso", "GPU - usage",
+            "GPUs listadas", "GPUs listed",
+            "Gabinete", "Case",
+            "Ha sinais de desgaste, erros ou temperatura alta. Mantenha backup em dia e acompanhe.", "There are signs of wear, errors or high temperature. Keep your backups up to date and monitor it.",
+            "Hibernacao ATIVADA.", "Hibernation ENABLED.",
+            "Hibernacao DESATIVADA (hiberfil.sys removido).", "Hibernation DISABLED (hiberfil.sys removed).",
+            "Historico do grafico (CSV)...", "Graph history (CSV)...",
+            "Horas ligado", "Power-on hours",
+            "Host reverso: ", "Reverse host: ",
+            "Hypervisor ativo (Hyper-V / WSL2)", "Hypervisor active (Hyper-V / WSL2)",
+            "ID de hardware (PNP)", "Hardware ID (PNP)",
+            "ID do processador", "Processor ID",
+            "IP externo: ", "External IP: ",
+            "IP preferido (v6 se houver): ", "Preferred IP (v6 if available): ",
+            "Identificacao concluida: RPM maximo guardado (usado em \"Definir por RPM\").", "Identification finished: max RPM saved (used in \"Set by RPM\").",
+            "Identificador", "Identifier",
+            "Identificar (100% por 5 s)", "Identify (100% for 5 s)",
+            "Identificar = liga as selecionadas a 100% por 5 s para voce descobrir qual e qual.  Botao direito na lista: selecionar por tipo (CPU, bombas, gabinete) ou renomear (inclua CPU, Bomba ou Gabinete no nome).", "Identify = runs the selected fans at 100% for 5 s so you can tell which is which.  Right-click the list: select by type (CPU, pumps, case) or rename (include CPU, Pump or Case in the name).",
+            "Idioma:", "Language:",
+            "Imagem do grafico (PNG)...", "Graph image (PNG)...",
+            "Indisponivel (a leitura exata so existe no driver NVIDIA; veja no AMD Adrenalin: Smart Access Memory, ou na BIOS)", "Unavailable (the exact reading only exists in the NVIDIA driver; check AMD Adrenalin: Smart Access Memory, or the BIOS)",
+            "Indisponivel (placa sem ECC)", "Unavailable (board without ECC)",
+            "Indisponivel (placa/driver nao expoe)", "Unavailable (board/driver does not expose it)",
+            "Indisponivel (", "Unavailable (",
+            "Indisponivel: ", "Unavailable: ",
+            "Indisponivel", "Unavailable",
+            "Informe min e max validos.", "Enter valid min and max.",
+            "Inicializacao rapida (Fast Startup)", "Fast Startup",
+            "Inicializacao", "Startup",
+            "Iniciando...", "Starting...",
+            "Iniciar / parar o estresse de CPU", "Start / stop the CPU stress",
+            "Iniciar / parar o estresse de FPU", "Start / stop the FPU stress",
+            "Iniciar / parar o estresse de GPU", "Start / stop the GPU stress",
+            "Iniciar / parar o estresse de RAM", "Start / stop the RAM stress",
+            "Iniciar / parar o estresse de SSD", "Start / stop the SSD stress",
+            "Instalar PawnIO", "Install PawnIO",
+            "Integridade de memoria (HVCI)", "Memory integrity (HVCI)",
+            "Intel (soquete nao identificado)", "Intel (socket not identified)",
+            "Intel IGCL (experimental): o driver Intel valida os limites; valores fora da faixa sao recusados.", "Intel IGCL (experimental): the Intel driver validates the limits; out-of-range values are rejected.",
+            "Interrompido pelo usuario.", "Interrupted by the user.",
+            "Isolamento de nucleo ATIVADO. Reinicie o PC.", "Core isolation ENABLED. Restart the PC.",
+            "Isolamento de nucleo DESATIVADO. Reinicie o PC.", "Core isolation DISABLED. Restart the PC.",
+            "Janela de render fechada: teste interrompido.", "Render window closed: test interrupted.",
+            "LHM aberto (CPU, GPU, placa-mae, memoria)", "LHM opened (CPU, GPU, motherboard, memory)",
+            "Largura de endereco", "Address width",
+            "Latencia da RAM (bloco de ", "RAM latency (block of ",
+            "Latência real do CAS: ", "Actual CAS latency: ",
+            "Leitura de sensores", "Sensor reading",
+            "Leitura dos sensores da CPU", "CPU sensor reading",
+            "Leitura", "Reading",
+            "Lendo a lista de programas instalados...", "Reading the list of installed programs...",
+            "Lendo informacoes da CPU...", "Reading CPU information...",
+            "Lendo módulos...", "Reading modules...",
+            "Lendo os discos (Windows Storage + S.M.A.R.T.)...", "Reading disks (Windows Storage + S.M.A.R.T.)...",
+            "Lendo os timings direto do controlador de memória...", "Reading timings directly from the memory controller...",
+            "Ligado (exigido pelo BAR grande)", "On (required by the large BAR)",
+            "Ligado: cada linha usa a propria escala (0-100%). Desligado: mesma escala para todas.", "On: each line uses its own scale (0-100%). Off: same scale for all.",
+            "Ligado - faixa ", "On - range ",
+            "Ligado (", "On (",
+            "Ligado", "On",
+            "Limitacao de clock agora", "Current clock limit",
+            "Limite de potencia (TDP)", "Power limit (TDP)",
+            "Limite de potencia atual", "Current power limit",
+            "Limite de potencia padrao", "Default power limit",
+            "Limite de potencia", "Power limit",
+            "Limite de temperatura", "Temperature limit",
+            "Limpar historico", "Clear history",
+            "Localizacao aproximada: ", "Approximate location: ",
+            "MPO desativado. Reinicie o PC.", "MPO disabled. Restart the PC.",
+            "MPO restaurado ao padrao. Reinicie o PC.", "MPO restored to default. Restart the PC.",
+            "Manter a atual", "Keep current",
+            "Marque (caixinha) os processos que quer alterar. Sem nenhum marcado, vale a selecao com Ctrl/Shift.", "Check the processes you want to change. With none checked, the Ctrl/Shift selection is used.",
+            "Marque (caixinha) ou selecione pelo menos um processo na lista.", "Check or select at least one process in the list.",
+            "Marque pelo menos um CPU antes de salvar.", "Check at least one CPU before saving.",
+            "Marque pelo menos um CPU na grade.", "Check at least one CPU in the grid.",
+            "Marque sensores na lista (ou use 'Essenciais') para ver o grafico", "Check sensors in the list (or use 'Essentials') to see the graph",
+            "Marque sensores para o grafico primeiro.", "Check sensors for the graph first.",
+            "Media:", "Average:",
+            "Medindo (feche outros programas para um resultado melhor)...", "Measuring (close other programs for a better result)...",
+            "Medindo download...", "Measuring download...",
+            "Medindo latencia...", "Measuring latency...",
+            "Medindo upload...", "Measuring upload...",
+            "Memoria RAM", "RAM",
+            "Memoria de video (VRAM)", "Video memory (VRAM)",
+            "Memoria livre insuficiente para o teste.", "Not enough free memory for the test.",
+            "Memoria/Dados", "Memory/Data",
+            "Memoria: ", "Memory: ",
+            "Menu classico ativado. Reinicie o Explorer ou faca logoff.", "Classic menu enabled. Restart Explorer or sign out.",
+            "Menu padrao do Windows 11 restaurado. Reinicie o Explorer ou faca logoff.", "Windows 11 default menu restored. Restart Explorer or sign out.",
+            "Metade", "Half",
+            "Mitigacoes DESATIVADAS. Reinicie o PC.", "Mitigations DISABLED. Restart the PC.",
+            "Mitigacoes restauradas ao padrao do Windows. Reinicie o PC.", "Mitigations restored to the Windows default. Restart the PC.",
+            "Mobile (soldada)", "Mobile (soldered)",
+            "Modelo", "Model",
+            "Modo de computacao", "Compute mode",
+            "Modo de jogo (Game Mode)", "Game Mode",
+            "Monitor conectado / display ativo", "Connected monitor / active display",
+            "Mostrar / ocultar no grafico", "Show / hide on graph",
+            "Motivos: ", "Reasons: ",
+            "Muda o visual do programa: Luna (XP), Frutiger Aero (Win7), Dark/AMOLED, Neon, Steampunk ou Vintage (Windows 95)", "Changes the program's look: Luna (XP), Frutiger Aero (Win7), Dark/AMOLED, Neon, Steampunk or Vintage (Windows 95)",
+            "NAO (rode como administrador)", "NO (run as administrator)",
+            "Nada sobrou: nenhum resto encontrado para ", "Nothing left: no leftovers found for ",
+            "Nao consegui criar o arquivo de teste em ", "Could not create the test file in ",
+            "Nao foi possivel abrir o navegador: ", "Could not open the browser: ",
+            "Nao foi possivel consultar o IP externo: ", "Could not look up the external IP: ",
+            "Nao foi possivel criar o ponto de restauracao (o Windows limita 1 a cada 24 h, ou a protecao do sistema esta desligada). Continuando.", "Could not create the restore point (Windows limits it to 1 per 24 h, or system protection is off). Continuing.",
+            "Nao foi possivel instalar automaticamente (", "Could not install automatically (",
+            "Nao foi possivel ler: ", "Could not read: ",
+            "Nao foi possivel medir (sem internet ou bloqueio de rede?): ", "Could not measure (no internet or network block?): ",
+            "Nao foi possivel remover:\n\n", "Could not remove:\n\n",
+            "Nao foi possivel restaurar o modo automatico.", "Could not restore automatic mode.",
+            "Nao sei qual e a pasta deste programa; use 'Escolher pasta ou .exe' para informar.", "I don't know this program's folder; use 'Choose folder or .exe' to tell me.",
+            "Navegadores e jogos criam varios processos com o mesmo nome; isto altera todos de uma vez.", "Browsers and games create several processes with the same name; this changes all of them at once.",
+            "Nenhum ajuste disponivel nesta placa.", "No adjustments available on this card.",
+            "Nenhum backend de overclock para esta GPU. ", "No overclock backend for this GPU. ",
+            "Nenhum drive disponivel para o teste de SSD.", "No drive available for the SSD test.",
+            "Nenhum item marcado.", "No item checked.",
+            "Nenhum módulo informado pelo Windows (WMI)", "No module reported by Windows (WMI)",
+            "Nenhum processo desse programa esta aberto.", "No process of this program is open.",
+            "Nenhum resultado para copiar ainda.", "No result to copy yet.",
+            "Nenhum resultado para salvar ainda.", "No result to save yet.",
+            "Nenhuma GPU encontrada pelo OpenCL.", "No GPU found by OpenCL.",
+            "Nenhuma GPU selecionada.", "No GPU selected.",
+            "Nenhuma placa de video foi detectada.\nRode como administrador e confira a pasta libs.", "No graphics card was detected.\nRun as administrator and check the libs folder.",
+            "Nenhuma ventoinha controlavel do tipo \"", "No controllable fan of type \"",
+            "Nenhuma ventoinha encontrada", "No fan found",
+            "Nenhuma", "None",
+            "Nome (inclua CPU, Bomba ou Gabinete para definir o tipo):", "Name (include CPU, Pump or Case to set the type):",
+            "Nome do PC: ", "PC name: ",
+            "Nome do hardware nao identificado.", "Hardware name not identified.",
+            "Nome do preset (ex.: Jogo - nucleos fisicos):", "Preset name (e.g. Game - physical cores):",
+            "Nome do processo (ex.: game.exe). Preset: ", "Process name (e.g. game.exe). Preset: ",
+            "Nome", "Name",
+            "Normalizar escala", "Normalize scale",
+            "Nucleo: ", "Core: ",
+            "Nucleos (CPUs logicos) que os processos marcados podem usar", "Cores (logical CPUs) the checked processes may use",
+            "Nucleos CUDA", "CUDA cores",
+            "Nucleos fisicos", "Physical cores",
+            "NvAPI EnumGPUs erro ", "NvAPI EnumGPUs error ",
+            "NvAPI SetPstates20 erro ", "NvAPI SetPstates20 error ",
+            "NvAPI indisponivel", "NvAPI unavailable",
+            "NvAPI sem SetPstates20", "NvAPI without SetPstates20",
+            "NvAPI_Initialize erro ", "NvAPI_Initialize error ",
+            "Não consegui ler: ", "Could not read: ",
+            "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo Buno's Tunner) precisa para acessar o hardware. ", "PawnIO is a signed, open-source driver that LibreHardwareMonitor (used by Buno's Tunner) needs to access the hardware. ",
+            "O PawnIO ja esta instalado.", "PawnIO is already installed.",
+            "O Windows nao informou S.M.A.R.T. deste disco (comum em discos USB e controladoras RAID).", "Windows did not report S.M.A.R.T. for this disk (common on USB disks and RAID controllers).",
+            "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "The installer was closed, but PawnIO was not detected. Try again.",
+            "O link do ", "The link for ",
+            "OC das GPUs (NVML/ADL/IGCL)", "GPU OC (NVML/ADL/IGCL)",
+            "OK (ADL Overdrive6): ventoinha em ", "OK (ADL Overdrive6): fan at ",
+            "OK (ADL Overdrive8): velocidade minima da ventoinha em ", "OK (ADL Overdrive8): minimum fan speed at ",
+            "OK (IGCL): ventoinha em ", "OK (IGCL): fan at ",
+            "OK (NVML): ventoinha(s) em ", "OK (NVML): fan(s) at ",
+            "OK: automatico", "OK: automatic",
+            "Observacao", "Note",
+            "Ocultar sem leitura", "Hide without reading",
+            "Offset do clock da memoria, em MHz", "Memory clock offset, in MHz",
+            "Offset do clock da memoria", "Memory clock offset",
+            "Offset do clock do nucleo, em MHz acima do padrao", "Core clock offset, in MHz above default",
+            "Offset do clock do nucleo", "Core clock offset",
+            "Ok - driver de sensores funcionando", "OK - sensor driver working",
+            "OpenCL nao encontrado (instale o driver da placa de video).", "OpenCL not found (install the graphics driver).",
+            "OpenCL: erro ao compilar (", "OpenCL: compile error (",
+            "OpenCL: erro ", "OpenCL: error ",
+            "OpenCL: falha ao carregar o programa (", "OpenCL: failed to load the program (",
+            "OpenCL: falha ao criar contexto (", "OpenCL: failed to create context (",
+            "OpenCL: falha na fila de comandos (", "OpenCL: command queue failure (",
+            "OpenCL: sem memoria de video para o teste.", "OpenCL: not enough video memory for the test.",
+            "OpenGL indisponivel (", "OpenGL unavailable (",
+            "Os sensores da CPU (temperatura, tensao, consumo) precisam do driver do LibreHardwareMonitor, e ele nao esta conseguindo ler esta CPU.\n\n", "CPU sensors (temperature, voltage, power) need the LibreHardwareMonitor driver, and it is unable to read this CPU.\n\n",
+            "Outra", "Other",
+            "Outros", "Others",
+            "Outro", "Other",
+            "Overclock / limites - ", "Overclock / limits - ",
+            "Overclock / ventoinha", "Overclock / fan",
+            "Overclock indisponivel para esta GPU. ", "Overclock unavailable for this GPU. ",
+            "Overdrive indisponivel nesta placa/driver (ative \"Ajuste manual\" no AMD Adrenalin)", "Overdrive unavailable on this card/driver (enable \"Manual tuning\" in AMD Adrenalin)",
+            "Overdrive6_FanSpeed_Reset erro ", "Overdrive6_FanSpeed_Reset error ",
+            "Overdrive6_FanSpeed_Set erro ", "Overdrive6_FanSpeed_Set error ",
+            "Overdrive8: nucleo = clock maximo; memoria = clock maximo (MHz reais); potencia em % relativo ao padrao.", "Overdrive8: core = max clock; memory = max clock (real MHz); power in % relative to default.",
+            "Overdrive8_Init_Setting_Get erro ", "Overdrive8_Init_Setting_Get error ",
+            "Overdrive8_Setting_Set erro ", "Overdrive8_Setting_Set error ",
+            "Overlay do DLSS ativado.", "DLSS overlay enabled.",
+            "Overlay do DLSS desativado.", "DLSS overlay disabled.",
+            "PAUSADO", "PAUSED",
+            "PCIe (agora)", "PCIe (now)",
+            "PCIe (maximo da placa)", "PCIe (card maximum)",
+            "PCIe - geracao", "PCIe - generation",
+            "PCIe - largura (x)", "PCIe - width (x)",
+            "Padrao do Windows (nao alterado)", "Windows default (unchanged)",
+            "Padrao", "Default",
+            "Parado por seguranca: temperatura de ", "Stopped for safety: temperature of ",
+            "Passe o mouse sobre o grafico para ver os valores de cada instante", "Hover over the graph to see the values at each moment",
+            "Pastas e arquivos irao para a Lixeira.\n", "Folders and files will go to the Recycle Bin.\n",
+            "Pastas e arquivos serao APAGADOS de vez.\n", "Folders and files will be DELETED permanently.\n",
+            "Pausar", "Pause",
+            "PawnIO instalado! Feche e abra o Buno's Tunner para os sensores, ventoinhas e timings passarem a usar o driver.", "PawnIO installed! Close and reopen Buno's Tunner so sensors, fans and timings start using the driver.",
+            "PawnIO instalado: ", "PawnIO installed: ",
+            "PawnIO instalado", "PawnIO installed",
+            "PawnIO nao instalado; ", "PawnIO not installed; ",
+            "PawnIO: driver usado pelo LibreHardwareMonitor para ler sensores da CPU/placa-mae e controlar as ventoinhas da placa-mae. Clique para baixar e instalar.", "PawnIO: driver used by LibreHardwareMonitor to read CPU/motherboard sensors and control motherboard fans. Click to download and install.",
+            "PawnIOLib.dll nao encontrada; ", "PawnIOLib.dll not found; ",
+            "PawnIOLib.dll sem as funcoes esperadas; ", "PawnIOLib.dll without the expected functions; ",
+            "Pico:", "Peak:",
+            "Placa-mae (Super I/O)", "Motherboard (Super I/O)",
+            "Placa-mae", "Motherboard",
+            "Ponto de restauracao criado.", "Restore point created.",
+            "Por que?\n", "Why?\n",
+            "Potencia", "Power",
+            "Pouco espaco livre no drive ", "Little free space on drive ",
+            "Processador - Zona termica (Windows/ACPI)", "Processor - Thermal zone (Windows/ACPI)",
+            "Processador de video", "Video processor",
+            "Processador", "Processor",
+            "Procurando restos de ", "Looking for leftovers of ",
+            "Procurando restos...", "Looking for leftovers...",
+            "Proibido", "Forbidden",
+            "Pronto: ", "Ready: ",
+            "Pronto", "Ready",
+            "Provedor (ISP/ASN): ", "Provider (ISP/ASN): ",
+            "Quando o processo abrir, o preset e aplicado sozinho (ex.: jogo.exe -> nucleos fisicos).", "When the process starts, the preset is applied automatically (e.g. game.exe -> physical cores).",
+            "Quantidade de ventoinhas", "Number of fans",
+            "RAM - mapa de memoria", "RAM - memory map",
+            "RAM em uso", "RAM in use",
+            "REMOCAO FORCADA de \"", "FORCED REMOVAL of \"",
+            "RPM = giros por minuto. % = potencia enviada. \"so leitura\" = a placa-mae nao permite controle por software.", "RPM = revolutions per minute. % = power sent. \"read-only\" = the motherboard does not allow software control.",
+            "Recomendamos a instalacao do PawnIO.\n\n", "We recommend installing PawnIO.\n\n",
+            "Redefinir: ", "Reset: ",
+            "Registro", "Registry",
+            "Regra aplicada: ", "Rule applied: ",
+            "Removendo...", "Removing...",
+            "Remover alerta", "Remove alert",
+            "Remover ", "Remove ",
+            "Renomear ventoinha", "Rename fan",
+            "Renomear...", "Rename...",
+            "Resolucao atual", "Current resolution",
+            "Resultados copiados.", "Results copied.",
+            "Revisao", "Revision",
+            "Ring0 (LHM) com PCI: ", "Ring0 (LHM) with PCI: ",
+            "Roda CPU, FPU, RAM e GPU um apos o outro, cada um com a duracao do seu bloco (o SSD fica de fora para nao gerar desgaste).", "Runs CPU, FPU, RAM and GPU one after another, each with its block's duration (the SSD is left out to avoid wear).",
+            "Rodando...", "Running...",
+            "Ruim", "Poor",
+            "SEGURANCA: ", "SECURITY: ",
+            "SEGURANCA", "SECURITY",
+            "SLAT (paginacao aninhada)", "SLAT (nested paging)",
+            "SSD - mapa de blocos do disco", "SSD - disk block map",
+            "Salvar imagem do render (PNG)", "Save render image (PNG)",
+            "Salvo em ", "Saved to ",
+            "Salvo: ", "Saved: ",
+            "Se esquentar demais, as ventoinhas vao a 100% mesmo no modo manual.", "If it gets too hot, the fans go to 100% even in manual mode.",
+            "Segundos", "Seconds",
+            "Seguranca baseada em virtualizacao (VBS)", "Virtualization-based security (VBS)",
+            "Seguranca: forcar 100% se a temperatura passar de", "Safety: force 100% if the temperature goes above",
+            "Selecionadas a 100% por 5 s. Veja/ouca qual acelerou e acompanhe o RPM na lista.", "Selected ones at 100% for 5 s. See/hear which one sped up and follow the RPM in the list.",
+            "Selecionado", "Selected",
+            "Selecionar so as controlaveis", "Select only the controllable ones",
+            "Selecionar todas", "Select all",
+            "Selecionar: CPU", "Select: CPU",
+            "Selecionar: GPU", "Select: GPU",
+            "Selecionar: bombas / AIO", "Select: pumps / AIO",
+            "Selecionar: gabinete", "Select: case",
+            "Selecione na lista pelo menos uma ventoinha controlavel.", "Select at least one controllable fan in the list.",
+            "Selecione pelo menos uma ventoinha controlavel.", "Select at least one controllable fan.",
+            "Selecione uma ventoinha para renomear.", "Select a fan to rename.",
+            "Sem copia do registro.", "No registry copy.",
+            "Sem dados", "No data",
+            "Sem ele ficam sem leitura: varios sensores de temperatura da CPU e da placa-mae, o controle das ventoinhas ligadas a placa-mae e os timings da memoria RAM.\n\n", "Without it these have no reading: several CPU and motherboard temperature sensors, control of the fans connected to the motherboard, and the RAM timings.\n\n",
+            "Sem leitura de temperatura - veja o LEIA-ME (driver bloqueado?)", "No temperature reading - see the README (driver blocked?)",
+            "Sensores atualizando a cada ", "Sensors updating every ",
+            "Sensores da CPU sem leitura", "CPU sensors without reading",
+            "Sensores expostos (LHM)", "Exposed sensors (LHM)",
+            "Servico", "Service",
+            "Servidor DHCP: ", "DHCP server: ",
+            "So no grafico", "Only on graph",
+            "Soquete", "Socket",
+            "Sufixo DNS: ", "DNS suffix: ",
+            "Tarefa", "Task",
+            "Taxa de atualizacao do monitor", "Monitor refresh rate",
+            "Taxa de dados", "Data rate",
+            "Taxa (", "Rate (",
+            "Temp Limit (alvo termico)", "Temp Limit (thermal target)",
+            "Temp. alvo (limite de temperatura)", "Target temp. (temperature limit)",
+            "Temp. de desligamento", "Shutdown temp.",
+            "Temp. de slowdown (throttle)", "Slowdown temp. (throttle)",
+            "Temp. maxima da GPU", "Max GPU temp.",
+            "Temp. maxima da memoria", "Max memory temp.",
+            "Temperatura do nucleo", "Core temperature",
+            "Temperatura maxima registrada", "Max recorded temperature",
+            "Temperatura hotspot", "Hotspot temperature",
+            "Temperatura: ", "Temperature: ",
+            "Temperatura", "Temperature",
+            "Tempo entre as leituras dos sensores (100 a 10000 ms). Menos = mais fluido, mas usa mais CPU.", "Time between sensor readings (100 to 10000 ms). Lower = smoother, but uses more CPU.",
+            "Tempo:", "Time:",
+            "Teste cancelado.", "Test cancelled.",
+            "Teste concluido.", "Test finished.",
+            "Teste finalizado.", "Test ended.",
+            "Threads (processadores logicos)", "Threads (logical processors)",
+            "Tipo (LHM)", "Type (LHM)",
+            "Tipo / interface", "Type / interface",
+            "Tipo: ", "Type: ",
+            "Tipo:", "Type:",
+            "Todas as ventoinhas voltaram ao automatico.", "All fans went back to automatic.",
+            "Todos os tipos", "All types",
+            "Todos (", "All (",
+            "Todas", "All",
+            "Tudo certo. Em HDDs, observe erros e temperatura (ideal abaixo de 50 C).", "All good. On HDDs, watch errors and temperature (ideally below 50 C).",
+            "Tudo certo. SSDs perdem vida conforme a quantidade de dados gravados; valores abaixo de 30% pedem atencao.", "All good. SSDs lose life according to the amount of data written; values below 30% need attention.",
+            "Uma copia das chaves do registro sera salva em BunosTunner_backup.", "A copy of the registry keys will be saved in BunosTunner_backup.",
+            "Usando ", "Using ",
+            "Use isto para programas que nao aparecem na lista (portateis, restos de algo ja removido, etc.).\n\nO que voce quer escolher?", "Use this for programs that do not appear in the list (portable ones, leftovers of something already removed, etc.).\n\nWhat do you want to choose?",
+            "Uso (%)", "Usage (%)",
+            "Uso do controlador de memoria", "Memory controller usage",
+            "Uso do nucleo", "Core usage",
+            "Uso total", "Total usage",
+            "Usuario: ", "User: ",
+            "VRAM em uso (%)", "VRAM in use (%)",
+            "VRAM usada", "VRAM used",
+            "Valor invalido.", "Invalid value.",
+            "Valores atuais (CSV)...", "Current values (CSV)...",
+            "Valores originais restaurados.", "Original values restored.",
+            "Variacao", "Variation",
+            "Velocidade:", "Speed:",
+            "Ventoinha (%)", "Fan (%)",
+            "Ventoinha (RPM)", "Fan (RPM)",
+            "Ventoinha da CPU", "CPU fan",
+            "Ventoinhas da GPU", "GPU fans",
+            "Ventoinhas", "Fans",
+            "Versao do driver (Windows)", "Driver version (Windows)",
+            "Virtualizacao no firmware (VT-x / AMD-V)", "Virtualization in firmware (VT-x / AMD-V)",
+            "Voltagem:", "Voltage:",
+            "Voltagem", "Voltage",
+            "WMI indisponivel: ", "WMI unavailable: ",
+            "Zerar min/max deste sensor", "Reset min/max of this sensor",
+            "Zona termica", "Thermal zone",
+            "Zona ", "Zone ",
+            "\" (pasta ", "\" (folder ",
+            "\" (renomeie as suas para classificar).", "\" (rename yours to classify).",
+            "\" passar de (", "\" goes above (",
+            "\" salvo.", "\" saved.",
+            "\" selecionada(s).", "\" selected.",
+            "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o Buno's Tunner procura o que sobrou para voce revisar.", "\"?\n\n1) The official uninstaller will open (follow its screens).\n2) Then Buno's Tunner looks for what was left behind for you to review.",
+            "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "\"\n\nThis does NOT use the uninstaller: it ends the program's processes, stops its services and lists everything that belongs to it (folder, registry, startup, tasks) for you to delete.\n\nNothing is deleted before you review and confirm the list. Continue?",
+            "\n(copiado para a area de transferencia)", "\n(copied to the clipboard)",
+            "\n(tempo esgotado)", "\n(timed out)",
+            "\n\nSe o arquivo esta em uso, feche o programa (ou use 'Remocao forcada') e tente de novo; ou reinicie o PC.", "\n\nIf the file is in use, close the program (or use 'Forced removal') and try again; or restart the PC.",
+            "a LibreHardwareMonitorLib.dll da pasta libs nao traz o modulo PawnIO (DLL antiga: atualize); ", "the LibreHardwareMonitorLib.dll in the libs folder does not include the PawnIO module (old DLL: update it); ",
+            "acesso negado (rode como administrador)", "access denied (run as administrator)",
+            "adaptador AMD nao encontrado no ADL", "AMD adapter not found in ADL",
+            "alta", "high",
+            "media", "medium",
+            "argumento invalido", "invalid argument",
+            "arquivo protegido", "protected file",
+            "atiadlxx.dll nao encontrada (instale o driver Radeon/Adrenalin)", "atiadlxx.dll not found (install the Radeon/Adrenalin driver)",
+            "chave invalida", "invalid key",
+            "chave protegida", "protected key",
+            "clock de aplicativo", "application clock",
+            "codigo ", "code ",
+            "controlador de memória da CPU (AMD Ryzen, canal ", "CPU memory controller (AMD Ryzen, channel ",
+            "desligado no .ini (vendoroc=0)", "disabled in the .ini (vendoroc=0)",
+            "distancia ate o TjMax", "distance to TjMax",
+            "em uso e nao foi possivel agendar a exclusao", "in use and the deletion could not be scheduled",
+            "entrada em Programas e Recursos", "entry in Programs and Features",
+            "erro ao inspecionar a DLL: ", "error inspecting the DLL: ",
+            "erro generico", "generic error",
+            "erro - ", "error - ",
+            "erro ", "error ",
+            "esta placa usa Overdrive ", "this card uses Overdrive ",
+            "esta plataforma (", "this platform (",
+            "este ajuste nao e exposto pelo driver Intel desta GPU", "this setting is not exposed by this GPU's Intel driver",
+            "fabricante sem suporte de OC nesta versao", "manufacturer without OC support in this version",
+            "falha ao carregar PawnIOLib.dll; ", "failed to load PawnIOLib.dll; ",
+            "falhou", "failed",
+            "fase 2 concluida (+", "phase 2 finished (+",
+            "fase 2 erro: ", "phase 2 error: ",
+            "fase 2: ", "phase 2: ",
+            "feature desligada no Adrenalin", "feature turned off in Adrenalin",
+            "formato de pixel OpenGL indisponivel", "OpenGL pixel format unavailable",
+            "freio de energia (HW)", "power brake (HW)",
+            "frontal", "front",
+            "gabinete", "case",
+            "grafico", "graph",
+            "indisponivel", "unavailable",
+            "janela mostrada", "window shown",
+            "leitura direta do controlador: só CPUs AMD Ryzen nesta versão", "direct controller reading: only AMD Ryzen CPUs in this version",
+            "limite de potencia (SW)", "power limit (SW)",
+            "limite de potencia fixo nesta placa (normal em notebooks: o fabricante trava o TDP)", "fixed power limit on this card (normal on laptops: the manufacturer locks the TDP)",
+            "limite de temperatura nao ajustavel nesta placa", "temperature limit not adjustable on this card",
+            "limite termico (HW)", "thermal limit (HW)",
+            "limite termico (SW)", "thermal limit (SW)",
+            "nao foi possivel criar o contexto OpenGL", "could not create the OpenGL context",
+            "nao foi possivel ler o controlador de memoria: ", "could not read the memory controller: ",
+            "nao suportado nesta GPU/notebook", "not supported on this GPU/laptop",
+            "nao suportado nesta placa", "not supported on this card",
+            "nao suportado", "not supported",
+            "nenhum adaptador ADL", "no ADL adapter",
+            "nenhum adaptador AMD no ADL (", "no AMD adapter in ADL (",
+            "nenhum dispositivo Intel (ctlEnumerateDevices 0x", "no Intel device (ctlEnumerateDevices 0x",
+            "nvml.dll nao encontrada", "nvml.dll not found",
+            "não informado pela BIOS", "not reported by the BIOS",
+            "o Windows nao informou discos", "Windows did not report disks",
+            "o driver Intel nao liberou overclock para esta GPU (so Arc dedicadas; graficos integrados nao tem)", "the Intel driver did not enable overclocking for this GPU (dedicated Arc only; integrated graphics do not have it)",
+            "o driver nao informa a faixa (comum em notebooks); valores acima do limite serao recusados", "the driver does not report the range (common on laptops); values above the limit will be rejected",
+            "o driver nao liberou este ajuste (", "the driver did not enable this setting (",
+            "ociosa (normal)", "idle (normal)",
+            "pawnio_load falhou (0x", "pawnio_load failed (0x",
+            "pawnio_open falhou (0x", "pawnio_open failed (0x",
+            "recurso inexistente neste driver", "feature not present in this driver",
+            "registradores do controlador nao reconhecidos nesta CPU (use o botao Diagnostico)", "controller registers not recognized on this CPU (use the Diagnostics button)",
+            "relatório do CPU-Z (", "CPU-Z report (",
+            "rode como Administrador", "run as Administrator",
+            "sem backend para este fabricante", "no backend for this manufacturer",
+            "sem driver NVIDIA", "no NVIDIA driver",
+            "sem implementacao", "not implemented",
+            "sem permissao no registro: ", "no registry permission: ",
+            "sem reset", "no reset",
+            "sensores prontos (fase 1)", "sensors ready (phase 1)",
+            "slowdown de hardware", "hardware slowdown",
+            "tipo desconhecido", "unknown type",
+            "traseira", "rear",
+            "versao de estrutura incompativel", "incompatible structure version",
+            "papel de parede", "wallpaper",
+            "sim", "yes",
+            "nao", "no",
+            "Sim", "Yes",
+            "ns x tamanho do bloco", "ns x block size" };
 
         static Lang()
         {
             for (int i = 0; i + 1 < Pairs.Length; i += 2) en[Pairs[i]] = Pairs[i + 1];
+            for (int i = 0; i + 1 < Pairs2.Length; i += 2) en[Pairs2[i]] = Pairs2[i + 1];
+            Dictionary<char, List<string>> tmp = new Dictionary<char, List<string>>();
+            foreach (string k in en.Keys)
+            {
+                if (k.Length == 0 || k == en[k]) continue;
+                List<string> l;
+                if (!tmp.TryGetValue(k[0], out l)) { l = new List<string>(); tmp[k[0]] = l; }
+                l.Add(k);
+            }
+            foreach (KeyValuePair<char, List<string>> kv in tmp)
+            {
+                kv.Value.Sort(delegate(string a, string b) { return b.Length != a.Length ? b.Length.CompareTo(a.Length) : string.CompareOrdinal(a, b); });
+                byFirst[kv.Key] = kv.Value.ToArray();
+            }
         }
+
         public static void Init()
         {
             string v = Settings.Get("lang", "auto");
             if (v == "pt") Cur = 0;
             else if (v == "en") Cur = 1;
             else Cur = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLower() == "pt" ? 0 : 1;
+            cache.Clear();
         }
+
+        static bool IsW(char c) { return char.IsLetterOrDigit(c); }
+
+        // traduz um texto qualquer (inteiro ou so trechos conhecidos dele); em portugues devolve o proprio texto
         public static string T(string pt)
         {
+            if (Cur == 0 || string.IsNullOrEmpty(pt)) return pt;
             string r;
-            return Cur == 0 || pt == null || !en.TryGetValue(pt, out r) ? pt : r;
+            if (en.TryGetValue(pt, out r)) return r;
+            if (cache.TryGetValue(pt, out r)) return r;
+            r = Frag(pt);
+            if (cache.Count > 6000) cache.Clear();
+            cache[pt] = r;
+            return r;
         }
+
+        static string Frag(string s)
+        {
+            StringBuilder sb = null;
+            int last = 0, i = 0, n = s.Length;
+            while (i < n)
+            {
+                string[] ks;
+                if (byFirst.TryGetValue(s[i], out ks) && !(i > 0 && IsW(s[i - 1]) && IsW(s[i])))
+                {
+                    string hit = null;
+                    for (int j = 0; j < ks.Length; j++)
+                    {
+                        string k = ks[j];
+                        if (i + k.Length > n) continue;
+                        if (string.CompareOrdinal(s, i, k, 0, k.Length) != 0) continue;
+                        int e = i + k.Length;
+                        if (IsW(k[k.Length - 1]) && e < n && IsW(s[e])) continue;
+                        hit = k; break;
+                    }
+                    if (hit != null)
+                    {
+                        if (sb == null) sb = new StringBuilder(n + 24);
+                        sb.Append(s, last, i - last).Append(en[hit]);
+                        i += hit.Length; last = i;
+                        continue;
+                    }
+                }
+                i++;
+            }
+            if (sb == null) return s;
+            sb.Append(s, last, n - last);
+            return sb.ToString();
+        }
+
+        static Holder H(object k) { return hold.GetValue(k, delegate(object o) { return new Holder(); }); }
+
+        // guarda o texto original (portugues) e mostra a versao no idioma atual
         static void Tx(object key, string cur, Action<string> set)
         {
-            string o;
-            if (!orig.TryGetValue(key, out o) || (cur != o && cur != T(o))) { o = cur; orig[key] = o; }
-            string t = T(o);
-            if (t != cur) set(t);
+            if (string.IsNullOrEmpty(cur)) return;
+            Holder h;
+            if (!hold.TryGetValue(key, out h))
+            {
+                string t0 = T(cur);
+                if (t0 == cur) return;
+                h = H(key); h.Src = cur;
+                Put(set, t0);
+                return;
+            }
+            if (h.Src == null || (cur != h.Src && cur != T(h.Src))) h.Src = cur;
+            string t = T(h.Src);
+            if (t != cur) Put(set, t);
         }
+
+        static void Put(Action<string> set, string t)
+        {
+            bool was = busy;
+            busy = true;
+            try { set(t); } finally { busy = was; }
+        }
+
+        // acompanha mudancas de texto feitas pelo programa depois (mensagens de status, resultados...)
+        static void Hook(Control c)
+        {
+            Holder h = H(c);
+            if (h.Hooked) return;
+            h.Hooked = true;
+            c.TextChanged += delegate
+            {
+                if (busy) return;
+                string cur = c.Text;
+                if (string.IsNullOrEmpty(cur)) return;
+                H(c).Src = cur;
+                if (Cur == 0) return;
+                string t = T(cur);
+                if (t != cur) { Put(delegate(string x) { c.Text = x; }, t); if (c is Form) c.Invalidate(); }
+            };
+        }
+
+        static void ApplyOne(Control c)
+        {
+            Control cc = c;
+            if (c is Label || c is XpButton || c is XpOption || c is Form)
+            {
+                if (!string.IsNullOrEmpty(c.Text)) Tx(c, c.Text, delegate(string t) { cc.Text = t; if (cc is Form) cc.Invalidate(); });
+                Hook(c);
+            }
+            XpGroup g = c as XpGroup;
+            if (g != null && !string.IsNullOrEmpty(g.Title)) Tx(g, g.Title, delegate(string t) { g.Title = t; });
+            TextBox tb = c as TextBox;
+            if (tb != null && tb.ReadOnly) { if (!string.IsNullOrEmpty(tb.Text)) Tx(tb, tb.Text, delegate(string t) { tb.Text = t; }); Hook(tb); }
+            ListView lv = c as ListView;
+            if (lv != null) foreach (ColumnHeader h in lv.Columns) { ColumnHeader hh = h; if (!string.IsNullOrEmpty(h.Text)) Tx(h, h.Text, delegate(string t) { hh.Text = t; }); }
+            ComboBox cb = c as ComboBox;
+            if (cb != null && cb.DropDownStyle == ComboBoxStyle.DropDownList && !(cb.Tag is string && (string)cb.Tag == "nolang") && cb.DrawMode == DrawMode.Normal)
+            {
+                cb.DrawMode = DrawMode.OwnerDrawFixed;
+                cb.DrawItem += DrawCombo;
+            }
+            if (c.ContextMenuStrip != null) Menu(c.ContextMenuStrip);
+        }
+
+        static void DrawCombo(object sender, DrawItemEventArgs e)
+        {
+            ComboBox cb = (ComboBox)sender;
+            e.DrawBackground();
+            if (e.Index >= 0 && e.Index < cb.Items.Count)
+            {
+                object it = cb.Items[e.Index];
+                string s = it == null ? "" : T(it.ToString());
+                Color fc = (e.State & DrawItemState.Selected) != 0 && (e.State & DrawItemState.ComboBoxEdit) == 0 ? SystemColors.HighlightText : cb.ForeColor;
+                TextRenderer.DrawText(e.Graphics, s, e.Font, new Rectangle(e.Bounds.X + 1, e.Bounds.Y, e.Bounds.Width - 1, e.Bounds.Height), fc,
+                    TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix);
+            }
+            e.DrawFocusRectangle();
+        }
+
+        // menus de contexto (itens traduzidos; fica registrado para trocar de idioma ao vivo)
+        public static void Menu(ToolStrip m)
+        {
+            if (m == null) return;
+            Holder h = H(m);
+            if (!h.Hooked) { h.Hooked = true; menus.Add(new WeakReference(m)); }
+            MenuItems(m.Items);
+        }
+
+        static void MenuItems(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem it in items)
+            {
+                ToolStripItem ii = it;
+                if (!string.IsNullOrEmpty(it.Text)) Tx(it, it.Text, delegate(string t) { ii.Text = t; });
+                ToolStripMenuItem mi = it as ToolStripMenuItem;
+                if (mi != null && mi.HasDropDownItems) MenuItems(mi.DropDownItems);
+            }
+        }
+
+        // traduz a janela inteira (e as que forem adicionadas depois)
         public static void Apply(Control c, ToolTip tip)
         {
             if (c == null) return;
-            if (c is Label || c is XpButton || c is XpOption) { if (!string.IsNullOrEmpty(c.Text)) { Control cc = c; Tx(c, c.Text, delegate(string t) { cc.Text = t; }); } }
-            XpGroup g = c as XpGroup;
-            if (g != null && !string.IsNullOrEmpty(g.Title)) Tx(g, g.Title, delegate(string t) { g.Title = t; });
-            ListView lv = c as ListView;
-            if (lv != null) foreach (ColumnHeader h in lv.Columns) { ColumnHeader hh = h; if (!string.IsNullOrEmpty(h.Text)) Tx(h, h.Text, delegate(string t) { hh.Text = t; }); }
-            if (tip != null)
+            ApplyOne(c);
+            if (hookedAdd.Add(c))
             {
-                string tt = tip.GetToolTip(c);
-                if (!string.IsNullOrEmpty(tt)) { Control cc2 = c; Tx(tip.GetHashCode() + "|" + c.GetHashCode(), tt, delegate(string t) { tip.SetToolTip(cc2, t); }); }
+                Control cc = c;
+                c.Disposed += delegate { hookedAdd.Remove(cc); };
+                c.ControlAdded += delegate(object sd, ControlEventArgs e) { Apply(e.Control, null); };
             }
-            foreach (Control k in c.Controls) Apply(k, tip);
+            foreach (Control k in c.Controls) Apply(k, null);
+        }
+        static HashSet<Control> hookedAdd = new HashSet<Control>();
+
+        // listas (ListView): troca o texto das celulas; roda de tempos em tempos e ao trocar de idioma
+        static void SweepLv(ListView lv)
+        {
+            foreach (ColumnHeader h in lv.Columns) { ColumnHeader hh = h; if (!string.IsNullOrEmpty(h.Text)) Tx(h, h.Text, delegate(string t) { hh.Text = t; }); }
+            foreach (ListViewItem it in lv.Items)
+                foreach (ListViewItem.ListViewSubItem sub in it.SubItems)
+                {
+                    ListViewItem.ListViewSubItem ss = sub;
+                    if (!string.IsNullOrEmpty(sub.Text)) Tx(sub, sub.Text, delegate(string t) { ss.Text = t; });
+                }
+        }
+
+        static void Sweep(Control c, bool all)
+        {
+            ListView lv = c as ListView;
+            if (lv != null && (all || lv.Visible)) SweepLv(lv);
+            ComboBox cb = c as ComboBox;
+            if (cb != null && all) cb.Invalidate();
+            foreach (Control k in c.Controls) Sweep(k, all);
+        }
+
+        // troca de idioma ao vivo
+        public static void Reapply()
+        {
+            cache.Clear();
+            Form[] fs = new Form[Application.OpenForms.Count];
+            Application.OpenForms.CopyTo(fs, 0);
+            foreach (Form f in fs) { Apply(f, null); Sweep(f, true); }
+            foreach (LTip t in Tips) t.Retranslate();
+            for (int i = menus.Count - 1; i >= 0; i--)
+            {
+                ToolStrip m = menus[i].Target as ToolStrip;
+                if (m == null) menus.RemoveAt(i); else MenuItems(m.Items);
+            }
+            if (Changed != null) Changed();
+        }
+
+        // a cada 0,5 s procura textos novos em listas (so quando esta em ingles)
+        public static void StartSweeper()
+        {
+            if (sweeper != null) return;
+            sweeper = new Timer();
+            sweeper.Interval = 500;
+            sweeper.Tick += delegate
+            {
+                if (Cur == 0) return;
+                Form[] fs = new Form[Application.OpenForms.Count];
+                Application.OpenForms.CopyTo(fs, 0);
+                foreach (Form f in fs) Sweep(f, false);
+            };
+            sweeper.Start();
         }
     }
 
@@ -382,7 +1378,7 @@ namespace BunosTunner
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), "Buno's Tunner - erro fatal");
+                Dlg.Show(ex.ToString(), "Buno's Tunner - erro fatal");
             }
         }
 
@@ -706,7 +1702,7 @@ namespace BunosTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.18.0";
+        public const string Version = "v1.18.1";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -1879,9 +2875,9 @@ namespace BunosTunner
                     if (k < s.V.Count) { rows.Add(s.Sn.Name + ": " + Num(s.V[s.V.Count - 1 - k]) + " " + Sn.Unit(s.Sn.Type)); cols.Add(s.Color); }
                 DrawBox(g, pl, (int)x + 10, pl.Bottom - rows.Count * 14 - 12, rows, cols);
             }
-            if (Paused) TextRenderer.DrawText(g, "PAUSADO", Xp.UiBold, new Point(pl.Right - 70, pl.Top + 4), Color.Yellow);
+            if (Paused) TextRenderer.DrawText(g, Lang.T("PAUSADO"), Xp.UiBold, new Point(pl.Right - 70, pl.Top + 4), Color.Yellow);
             if (Items.Count == 0)
-                TextRenderer.DrawText(g, "Marque sensores na lista (ou use 'Essenciais') para ver o grafico", Font, new Point(pl.Left + 20, pl.Top + pl.Height / 2), Xp.GraphText);
+                TextRenderer.DrawText(g, Lang.T("Marque sensores na lista (ou use 'Essenciais') para ver o grafico"), Font, new Point(pl.Left + 20, pl.Top + pl.Height / 2), Xp.GraphText);
         }
     }
 
@@ -4048,7 +5044,7 @@ namespace BunosTunner
         DateTime openedAt = DateTime.UtcNow;
         const string DefaultHint = "Dica: marque a caixinha (ou de duplo clique) para ver o sensor no grafico. Botao direito = alerta, copiar... Clique no cabecalho para ordenar.";
         ListView lv = new ListView(); XpGraph graph = new XpGraph(); Timer timer = new Timer();
-        Label lblInfo; XpButton btnPause; ContextMenuStrip menu, exportMenu; ToolTip tip = new ToolTip();
+        Label lblInfo; XpButton btnPause; ContextMenuStrip menu, exportMenu; LTip tip = new LTip();
         Dictionary<Sn, Series> ser = new Dictionary<Sn, Series>();
         Dictionary<Sn, ListViewItem> itemOf = new Dictionary<Sn, ListViewItem>();
         bool loading = true, sortAsc = true;
@@ -4145,7 +5141,9 @@ namespace BunosTunner
             timer.Tick += delegate { try { Tick2(); } catch (Exception) { } };
             timer.Start();
             FormClosing += delegate { SaveSettings(); };
-            FormClosed += delegate { timer.Stop(); };
+            Action langCh = delegate { RefreshCats(); };
+            Lang.Changed += langCh;
+            FormClosed += delegate { timer.Stop(); Lang.Changed -= langCh; };
             Tick2();
         }
 
@@ -4198,7 +5196,7 @@ namespace BunosTunner
             UI.DoubleBuffer(lv);
             lbCat = new ListBox(); lbCat.Dock = DockStyle.Left; lbCat.Width = 140; lbCat.Font = Xp.Ui; lbCat.IntegralHeight = false;
             lbCat.BorderStyle = BorderStyle.FixedSingle;
-            foreach (string c in catNames) lbCat.Items.Add(c);
+            foreach (string c in catNames) lbCat.Items.Add(Lang.T(c));
             lbCat.SelectedIndex = 0;
             lblHint = new Label(); lblHint.Dock = DockStyle.Top; lblHint.Height = 34; lblHint.Font = Xp.Ui; lblHint.ForeColor = Xp.Dim;
             lblHint.Text = DefaultHint;
@@ -4251,12 +5249,13 @@ namespace BunosTunner
             menu.Items.Add("Copiar nome", null, delegate { CopySel(false); });
             menu.Items.Add("Copiar valor", null, delegate { CopySel(true); });
             menu.Items.Add("Zerar min/max deste sensor", null, delegate { foreach (ListViewItem it in lv.SelectedItems) ((Sn)it.Tag).ResetMinMax(); });
-            lv.ContextMenuStrip = menu;
+            lv.ContextMenuStrip = menu; Lang.Menu(menu);
 
             exportMenu = new ContextMenuStrip(); exportMenu.RenderMode = ToolStripRenderMode.System;
             exportMenu.Items.Add("Valores atuais (CSV)...", null, delegate { ExportValues(); });
             exportMenu.Items.Add("Historico do grafico (CSV)...", null, delegate { ExportHistory(); });
             exportMenu.Items.Add("Imagem do grafico (PNG)...", null, delegate { ExportImage(); });
+            Lang.Menu(exportMenu);
         }
 
         // ---------- logica ----------
@@ -4273,7 +5272,7 @@ namespace BunosTunner
             int sel = lbCat.SelectedIndex;
             for (int i = 0; i < catNames.Length; i++)
             {
-                string t = catNames[i] + "  (" + n[i] + ")";
+                string t = Lang.T(catNames[i]) + "  (" + n[i] + ")";
                 if ((string)lbCat.Items[i] != t) lbCat.Items[i] = t;
             }
             if (lbCat.SelectedIndex != sel) lbCat.SelectedIndex = sel;
@@ -4282,7 +5281,7 @@ namespace BunosTunner
 
         void ShowHelp()
         {
-            MessageBox.Show(
+            Dlg.Show(
                 "COMO USAR OS SENSORES\n\n" +
                 "- Cartoes no topo: os valores principais (GPU, CPU, RAM, ventoinha) sempre a vista.\n" +
                 "- Lista: escolha a categoria a esquerda (GPU, CPU, Placa-mae, Memoria...) e use a busca (Ctrl+F) e o filtro de tipo.\n" +
@@ -4297,7 +5296,7 @@ namespace BunosTunner
 
         void DriverHelp()
         {
-            if (MessageBox.Show(
+            if (Dlg.Show(
                 "Os sensores da CPU (temperatura, tensao, consumo) precisam do driver do LibreHardwareMonitor, e ele nao esta conseguindo ler esta CPU.\n\n" +
                 "Causas comuns:\n" +
                 "1) \"Integridade de memoria\" (Isolamento de nucleo) do Windows ou o Defender bloqueando o driver: desative em Seguranca do Windows > Seguranca do dispositivo > Isolamento de nucleo e reinicie o PC.\n" +
@@ -4369,7 +5368,7 @@ namespace BunosTunner
             string q = txSearch.Text.Trim().ToLower();
             string[] words = q.Length == 0 ? new string[0] : q.Split(new char[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
             string area = (lbCat.SelectedIndex > 0 && lbCat.SelectedIndex < catNames.Length) ? catNames[lbCat.SelectedIndex] : null;
-            string cat = cbType.SelectedIndex > 0 ? (string)cbType.SelectedItem : null;
+            string cat = cbType.SelectedIndex > 0 && cbType.SelectedIndex <= Cats.Length ? Cats[cbType.SelectedIndex - 1] : null;
             loading = true;
             lv.BeginUpdate();
             lv.Items.Clear(); lv.Groups.Clear(); itemOf.Clear();
@@ -4416,7 +5415,7 @@ namespace BunosTunner
             lblInfo.Text = shown + " de " + list.Count + " sensores  |  " + ser.Count + " no grafico  |  " + alerts + " alerta(s)";
         }
 
-        static void SetSub(ListViewItem it, int i, string t) { if (it.SubItems[i].Text != t) it.SubItems[i].Text = t; }
+        static void SetSub(ListViewItem it, int i, string t) { t = Lang.T(t); if (it.SubItems[i].Text != t) it.SubItems[i].Text = t; }
 
         void Tick2()
         {
@@ -4524,7 +5523,7 @@ namespace BunosTunner
         {
             using (SaveFileDialog d = new SaveFileDialog())
             {
-                d.Filter = filter; d.FileName = name + "_" + key + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                d.Filter = Lang.T(filter); d.FileName = name + "_" + key + "_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 return d.ShowDialog(this) == DialogResult.OK ? d.FileName : null;
             }
         }
@@ -4544,7 +5543,7 @@ namespace BunosTunner
                 File.WriteAllText(f, sb.ToString(), new UTF8Encoding(true));
                 Say("Salvo: " + f);
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message, "Exportar"); }
+            catch (Exception ex) { Dlg.Show(ex.Message, "Exportar"); }
         }
 
         void ExportHistory()
@@ -4572,7 +5571,7 @@ namespace BunosTunner
                 File.WriteAllText(f, sb.ToString(), new UTF8Encoding(true));
                 Say("Salvo: " + f);
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message, "Exportar"); }
+            catch (Exception ex) { Dlg.Show(ex.Message, "Exportar"); }
         }
 
         void ExportImage()
@@ -4588,7 +5587,7 @@ namespace BunosTunner
                 }
                 Say("Salvo: " + f);
             }
-            catch (Exception ex) { MessageBox.Show(ex.Message, "Exportar"); }
+            catch (Exception ex) { Dlg.Show(ex.Message, "Exportar"); }
         }
 
         void SaveSettings()
@@ -5093,7 +6092,7 @@ namespace BunosTunner
             using (Pen fr = new Pen(Color.FromArgb(120, 120, 120))) g.DrawRectangle(fr, x0, y0, w, h);
             string st = "Render #" + (pass + 1) + "   blocos: " + doneB + "/" + NB + "   tempo: " + (doneB >= NB ? lastPass : (DateTime.UtcNow - passStart).TotalSeconds).ToString("0.0") + " s";
             if (lastPass > 0) st += "   ultimo: " + lastPass.ToString("0.0") + " s   melhor: " + bestPass.ToString("0.0") + " s";
-            TextRenderer.DrawText(g, st, SystemFonts.DefaultFont, new Point((int)x0 + 4, (int)y0 + 4), Color.White, Color.FromArgb(150, 0, 0, 0));
+            TextRenderer.DrawText(g, Lang.T(st), SystemFonts.DefaultFont, new Point((int)x0 + 4, (int)y0 + 4), Color.White, Color.FromArgb(150, 0, 0, 0));
         }
 
         // RAM: modulo de memoria com chips sendo preenchidos + fluxo de palavras hexadecimais sendo gravadas/conferidas
@@ -5237,15 +6236,15 @@ namespace BunosTunner
             g.SmoothingMode = SmoothingMode.AntiAlias;
             using (Font f = new Font("Tahoma", 10f, FontStyle.Bold), fb = new Font("Tahoma", 16f, FontStyle.Bold), fs = new Font("Tahoma", 8.25f))
             {
-                TextRenderer.DrawText(g, Names[Kind < 5 ? Kind : 0], f, new Point(12, 8), Color.FromArgb(255, 200, 60));
+                TextRenderer.DrawText(g, Lang.T(Names[Kind < 5 ? Kind : 0]), f, new Point(12, 8), Color.FromArgb(255, 200, 60));
                 string rt = Rate.ToString("0.0") + " " + Unit;
                 TextRenderer.DrawText(g, rt, fb, new Point(12, Height - 70), Color.White);
                 string tt = double.IsNaN(Temp) ? "-" : Temp.ToString("0") + " °C";
                 int es = (int)Elapsed, tot = (int)Total;
                 string tm2 = (es / 60).ToString("00") + ":" + (es % 60).ToString("00") + (tot > 0 ? " / " + (tot / 60).ToString("00") + ":" + (tot % 60).ToString("00") : "");
                 string info = "Temperatura: " + tt + "     Tempo: " + tm2 + "     Erros: " + Errors + (Kind == 0 || Kind == 2 ? "     FPS do render: " + fps.ToString("0") : "") + (Kind == 1 ? "     Pontos: " + (Rate * 100).ToString("0") + " pts" : "");
-                TextRenderer.DrawText(g, info, fs, new Point(12, Height - 36), Color.FromArgb(200, 200, 200));
-                if (!string.IsNullOrEmpty(Extra)) TextRenderer.DrawText(g, Extra, fs, new Point(12, Height - 20), Color.FromArgb(150, 150, 150));
+                TextRenderer.DrawText(g, Lang.T(info), fs, new Point(12, Height - 36), Color.FromArgb(200, 200, 200));
+                if (!string.IsNullOrEmpty(Extra)) TextRenderer.DrawText(g, Lang.T(Extra), fs, new Point(12, Height - 20), Color.FromArgb(150, 150, 150));
             }
         }
     }
@@ -5271,7 +6270,7 @@ namespace BunosTunner
             {
                 ContextMenuStrip cm = new ContextMenuStrip();
                 cm.Items.Add("Salvar imagem do render (PNG)", null, delegate { Cv.SavePng(); });
-                Cv.ContextMenuStrip = cm;
+                Lang.Menu(cm); Cv.ContextMenuStrip = cm;
             }
         }
     }
@@ -5312,8 +6311,8 @@ namespace BunosTunner
         // Baixa e executa o instalador oficial (pede permissao de administrador). Chamado pelo botao do menu Ventoinhas.
         public static void InstallNow(Control owner)
         {
-            if (Installed()) { MessageBox.Show(owner, "O PawnIO ja esta instalado.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
-            if (MessageBox.Show(owner, "Baixar e instalar o PawnIO agora?\n\nO instalador oficial (github.com/namazso/PawnIO.Setup) sera baixado e pedira permissao de administrador.", "Buno's Tunner - PawnIO", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            if (Installed()) { Dlg.Show(owner, "O PawnIO ja esta instalado.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (Dlg.Show(owner, "Baixar e instalar o PawnIO agora?\n\nO instalador oficial (github.com/namazso/PawnIO.Setup) sera baixado e pedira permissao de administrador.", "Buno's Tunner - PawnIO", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             string exe = Path.Combine(Path.GetTempPath(), "PawnIO_setup.exe");
             owner.Enabled = false;
             Th.ThreadPool.QueueUserWorkItem(delegate
@@ -5335,10 +6334,10 @@ namespace BunosTunner
                         owner.Enabled = true;
                         if (err != null)
                         {
-                            if (MessageBox.Show(owner, "Nao foi possivel instalar automaticamente (" + err + ").\nAbrir o download no navegador?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
+                            if (Dlg.Show(owner, "Nao foi possivel instalar automaticamente (" + err + ").\nAbrir o download no navegador?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) == DialogResult.Yes)
                                 try { Process.Start("https://github.com/namazso/PawnIO.Setup/releases/latest/download/PawnIO_setup.exe"); } catch (Exception) { }
                         }
-                        else if (done) MessageBox.Show(owner, Installed() ? "PawnIO instalado! Feche e abra o Buno's Tunner para os sensores, ventoinhas e timings passarem a usar o driver." : "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        else if (done) Dlg.Show(owner, Installed() ? "PawnIO instalado! Feche e abra o Buno's Tunner para os sensores, ventoinhas e timings passarem a usar o driver." : "O instalador foi fechado, mas o PawnIO nao foi detectado. Tente novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }));
                 }
                 catch (Exception) { }
@@ -5349,7 +6348,7 @@ namespace BunosTunner
         public static void CheckAtStartup(IWin32Window owner)
         {
             if (Installed()) return;
-            DialogResult r = MessageBox.Show(owner,
+            DialogResult r = Dlg.Show(owner,
                 "Recomendamos a instalacao do PawnIO.\n\n" +
                 "Por que?\n" +
                 "O PawnIO e um driver assinado e de codigo aberto que o LibreHardwareMonitor (usado pelo Buno's Tunner) precisa para acessar o hardware. " +
@@ -5367,7 +6366,7 @@ namespace BunosTunner
             {
                 try { Process.Start("https://pawnio.eu"); } catch (Exception) { }
             }
-            MessageBox.Show(owner, "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o Buno's Tunner novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            Dlg.Show(owner, "Depois do download, execute o PawnIO_setup.exe (como administrador), conclua a instalacao e abra o Buno's Tunner novamente.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
     }
 
@@ -5941,10 +6940,10 @@ namespace BunosTunner
         public static void Open(string name, bool gpu, IWin32Window owner)
         {
             string q = Query(name, gpu);
-            if (q.Length == 0) { MessageBox.Show(owner, "Nome do hardware nao identificado.", "Buno's Tunner"); return; }
+            if (q.Length == 0) { Dlg.Show(owner, "Nome do hardware nao identificado.", "Buno's Tunner"); return; }
             string url = "https://www.techpowerup.com/" + (gpu ? "gpu-specs/" : "cpu-specs/") + "?q=" + Uri.EscapeDataString(q);
             try { ProcessStartInfo psi = new ProcessStartInfo(url); psi.UseShellExecute = true; Process.Start(psi); }
-            catch (Exception ex) { MessageBox.Show(owner, "Nao foi possivel abrir o navegador: " + ex.Message, "Buno's Tunner"); }
+            catch (Exception ex) { Dlg.Show(owner, "Nao foi possivel abrir o navegador: " + ex.Message, "Buno's Tunner"); }
         }
     }
 
@@ -6419,7 +7418,7 @@ namespace BunosTunner
         Dictionary<FanCh, ListViewItem> items = new Dictionary<FanCh, ListViewItem>();
         List<FanCh> identList = new List<FanCh>();
         DateTime identUntil = DateTime.MinValue;
-        ToolTip tip = new ToolTip();
+        LTip tip = new LTip();
 
         public FanPage()
         {
@@ -6477,7 +7476,7 @@ namespace BunosTunner
             m.Items.Add(new ToolStripSeparator());
             m.Items.Add("Renomear...", null, delegate { Rename(); });
             m.Items.Add("Identificar (100% por 5 s)", null, delegate { Identify(); });
-            lv.ContextMenuStrip = m;
+            Lang.Menu(m); lv.ContextMenuStrip = m;
         }
 
         void BuildMode()
@@ -6541,7 +7540,7 @@ namespace BunosTunner
             if (r == null) return;
             c.Custom = (r == c.Name) ? "" : r;
             Settings.Set("fan.name." + c.Key, c.Custom);
-            it.Text = c.Display; it.SubItems[1].Text = c.Controllable ? c.RoleName : c.RoleName + " (so leitura)";
+            it.Text = c.Display; it.SubItems[1].Text = Lang.T(c.Controllable ? c.RoleName : c.RoleName + " (so leitura)");
         }
 
         void ApplySel()
@@ -6640,7 +7639,7 @@ namespace BunosTunner
             if (visible) UpdateUi();
         }
 
-        static void SetSub(ListViewItem it, int i, string t) { if (it.SubItems[i].Text != t) it.SubItems[i].Text = t; }
+        static void SetSub(ListViewItem it, int i, string t) { t = Lang.T(t); if (it.SubItems[i].Text != t) it.SubItems[i].Text = t; }
 
         void UpdateUi()
         {
@@ -7296,7 +8295,7 @@ namespace BunosTunner
             {
                 using (OpenFileDialog od = new OpenFileDialog())
                 {
-                    od.Filter = "CPU-Z (cpuz*.exe)|cpuz*.exe|Programas|*.exe"; od.Title = "Escolha o cpuz.exe (versao portatil ou instalada)";
+                    od.Filter = Lang.T("CPU-Z (cpuz*.exe)|cpuz*.exe|Programas|*.exe"); od.Title = Lang.T("Escolha o cpuz.exe (versao portatil ou instalada)");
                     if (od.ShowDialog(this) != DialogResult.OK) return;
                     Settings.Set("cpuzpath", od.FileName);
                 }
@@ -7312,7 +8311,7 @@ namespace BunosTunner
                 {
                     string d;
                     try { d = MemRead.Diagnose(); } catch (Exception ex) { d = ex.ToString(); }
-                    try { BeginInvoke(new Action(delegate { try { Clipboard.SetText(d); } catch (Exception) { } MessageBox.Show(this, d + "\n(copiado para a area de transferencia)", "Buno's Tunner - diagnostico dos timings"); })); } catch (Exception) { }
+                    try { BeginInvoke(new Action(delegate { try { Clipboard.SetText(d); } catch (Exception) { } Dlg.Show(this, d + "\n(copiado para a area de transferencia)", "Buno's Tunner - diagnostico dos timings"); })); } catch (Exception) { }
                 });
             });
             Controls.Add(g);
@@ -7438,7 +8437,7 @@ namespace BunosTunner
         volatile string pendingLog;
         bool busy, loadingPre; int sortCol; bool sortAsc = true;
         Timer timer = new Timer();
-        ToolTip tip = new ToolTip();
+        LTip tip = new LTip();
 
         public AffinityPage()
         {
@@ -7626,7 +8625,7 @@ namespace BunosTunner
             {
                 if (f.Length > 0 && r.Name.ToLower().IndexOf(f) < 0) continue;
                 alive.Add(r.Pid);
-                string[] t = { r.Name, r.Pid.ToString(), r.Cpu.ToString("0.0") + "%", (r.Mem >> 20) + " MB", MaskText(r.Mask), r.Prio };
+                string[] t = { r.Name, r.Pid.ToString(), r.Cpu.ToString("0.0") + "%", (r.Mem >> 20) + " MB", Lang.T(MaskText(r.Mask)), Lang.T(r.Prio) };
                 ListViewItem it;
                 if (!pidItem.TryGetValue(r.Pid, out it)) { it = new ListViewItem(t); it.Tag = r; pidItem[r.Pid] = it; lvP.Items.Add(it); }
                 else
@@ -7851,7 +8850,7 @@ namespace BunosTunner
         XpText txFind; Label lblInfo, lblMsg, lblSel; XpProgress pb;
         XpOption chkBin, chkReg, chkRestore;
         XpButton bUn, bForce, bScan, bDel, bKill;
-        ToolTip tipU = new ToolTip();
+        LTip tipU = new LTip();
         UProg lastProg; static int rebootN;
         List<UProg> progs = new List<UProg>();
         UProg sel; bool busy; int sortCol; bool sortAsc = true;
@@ -8030,7 +9029,7 @@ namespace BunosTunner
             {
                 using (FolderBrowserDialog fd = new FolderBrowserDialog())
                 {
-                    fd.Description = "Escolha a pasta do programa";
+                    fd.Description = Lang.T("Escolha a pasta do programa");
                     if (fd.ShowDialog(this) != DialogResult.OK) return;
                     path = fd.SelectedPath;
                 }
@@ -8039,7 +9038,7 @@ namespace BunosTunner
             {
                 using (OpenFileDialog od = new OpenFileDialog())
                 {
-                    od.Filter = "Programas (*.exe)|*.exe|Todos|*.*";
+                    od.Filter = Lang.T("Programas (*.exe)|*.exe|Todos|*.*");
                     if (od.ShowDialog(this) != DialogResult.OK) return;
                     path = od.FileName;
                 }
@@ -8049,7 +9048,7 @@ namespace BunosTunner
             string nm = Directory.Exists(path) ? new DirectoryInfo(path).Name : Path.GetFileNameWithoutExtension(path);
             try { if (File.Exists(path)) { FileVersionInfo vi = FileVersionInfo.GetVersionInfo(path); if (!string.IsNullOrEmpty(vi.ProductName)) nm = vi.ProductName.Trim(); if (!string.IsNullOrEmpty(vi.CompanyName)) p.Publisher = vi.CompanyName.Trim(); } } catch (Exception) { }
             p.Name = nm; p.Loc = folder.TrimEnd('\\'); p.Version = "(manual)";
-            if (!SafeFolder(p.Loc)) { MessageBox.Show("Essa pasta e protegida pelo sistema e nao pode ser usada aqui:\n" + p.Loc, "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (!SafeFolder(p.Loc)) { Dlg.Show("Essa pasta e protegida pelo sistema e nao pode ser usada aqui:\n" + p.Loc, "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
             progs.Insert(0, p);
             sortCol = -1; txFind.Box.Text = ""; FillProgs();
             if (lvP.Items.Count > 0) { sel = null; foreach (ListViewItem it in lvP.Items) if (it.Tag == p) { it.Selected = true; it.EnsureVisible(); break; } }
@@ -8145,7 +9144,7 @@ namespace BunosTunner
             if (!force)
             {
                 if (p.Uninst.Length == 0) { Msg("Este item nao tem desinstalador. Use 'Remocao forcada'."); return; }
-                if (MessageBox.Show("Desinstalar \"" + p.Name + "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o Buno's Tunner procura o que sobrou para voce revisar.", "Buno's Tunner - Desinstalar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
+                if (Dlg.Show("Desinstalar \"" + p.Name + "\"?\n\n1) O desinstalador oficial sera aberto (siga as telas dele).\n2) Depois o Buno's Tunner procura o que sobrou para voce revisar.", "Buno's Tunner - Desinstalar", MessageBoxButtons.OKCancel, MessageBoxIcon.Question) != DialogResult.OK) return;
                 if (chkRestore.Checked) MakeRestorePoint(p.Name);
                 Busy(true, "Desinstalador aberto: conclua as telas dele... (a busca de restos comeca quando ele terminar)");
                 string cmd = p.Uninst;
@@ -8165,7 +9164,7 @@ namespace BunosTunner
             }
             else
             {
-                if (MessageBox.Show("REMOCAO FORCADA de \"" + p.Name + "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "Buno's Tunner - Remocao forcada", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+                if (Dlg.Show("REMOCAO FORCADA de \"" + p.Name + "\"\n\nIsto NAO usa o desinstalador: encerra os processos do programa, para os servicos dele e lista tudo o que for dele (pasta, registro, inicializacao, tarefas) para voce apagar.\n\nNada e apagado antes de voce revisar e confirmar a lista. Continuar?", "Buno's Tunner - Remocao forcada", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
                 if (chkRestore.Checked) MakeRestorePoint(p.Name);
                 int k = KillProcs(p);
                 StartScan(p, k > 0 ? k + " processo(s) encerrado(s). Procurando restos..." : "Procurando restos...");
@@ -8175,7 +9174,7 @@ namespace BunosTunner
         {
             if (sel == null) return;
             if (string.IsNullOrEmpty(sel.Loc) || !SafeFolder(sel.Loc)) { Msg("Nao sei qual e a pasta deste programa; use 'Escolher pasta ou .exe' para informar."); return; }
-            if (MessageBox.Show("Finalizar todos os processos de \"" + sel.Name + "\" (pasta " + sel.Loc + ")?\nTrabalho nao salvo nele sera perdido.", "Buno's Tunner", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (Dlg.Show("Finalizar todos os processos de \"" + sel.Name + "\" (pasta " + sel.Loc + ")?\nTrabalho nao salvo nele sera perdido.", "Buno's Tunner", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             int n = KillProcs(sel);
             Msg(n > 0 ? n + " processo(s) finalizado(s)." : "Nenhum processo desse programa esta aberto.");
         }
@@ -8448,7 +9447,7 @@ namespace BunosTunner
             foreach (ListViewItem it in lvL.CheckedItems) items.Add((ULeft)it.Tag);
             if (items.Count == 0) { Msg("Nenhum item marcado."); return; }
             bool bin = chkBin.Checked, bak = chkReg.Checked;
-            if (MessageBox.Show("Remover " + items.Count + " item(ns) marcado(s)?\n\n" + (bin ? "Pastas e arquivos irao para a Lixeira.\n" : "Pastas e arquivos serao APAGADOS de vez.\n") + (bak ? "Uma copia das chaves do registro sera salva em BunosTunner_backup." : "Sem copia do registro."), "Buno's Tunner - Remover", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
+            if (Dlg.Show("Remover " + items.Count + " item(ns) marcado(s)?\n\n" + (bin ? "Pastas e arquivos irao para a Lixeira.\n" : "Pastas e arquivos serao APAGADOS de vez.\n") + (bak ? "Uma copia das chaves do registro sera salva em BunosTunner_backup." : "Sem copia do registro."), "Buno's Tunner - Remover", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return;
             Busy(true, "Removendo...");
             UProg kp = lastProg;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
@@ -8472,7 +9471,7 @@ namespace BunosTunner
                     {
                         Busy(false, ok + " item(ns) removido(s)" + (fails.Count > 0 ? ", " + fails.Count + " com falha." : ".") + (rebootN > 0 ? " " + rebootN + " arquivo(s) em uso serao apagados no proximo reinicio do Windows." : "") + (bak && regN > 0 ? " Copias do registro em BunosTunner_backup." : ""));
                         if (fails.Count > 0)
-                            MessageBox.Show("Nao foi possivel remover:\n\n" + string.Join("\n", fails.GetRange(0, Math.Min(12, fails.Count)).ToArray()) + "\n\nSe o arquivo esta em uso, feche o programa (ou use 'Remocao forcada') e tente de novo; ou reinicie o PC.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            Dlg.Show("Nao foi possivel remover:\n\n" + string.Join("\n", fails.GetRange(0, Math.Min(12, fails.Count)).ToArray()) + "\n\nSe o arquivo esta em uso, feche o programa (ou use 'Remocao forcada') e tente de novo; ou reinicie o PC.", "Buno's Tunner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         LoadProgs();
                         lvL.Items.Clear();
                     }));
@@ -8658,8 +9657,9 @@ namespace BunosTunner
                 Size us = TextRenderer.MeasureText(Unit, Xp.UiBold);
                 TextRenderer.DrawText(g, Unit, Xp.UiBold, new Point((int)(cx - us.Width / 2f), (int)(cy + rad * 0.22f + vs.Height - 2)), Xp.Dim);
             }
-            Size cs = TextRenderer.MeasureText(Caption, Xp.UiBold);
-            TextRenderer.DrawText(g, Caption, Xp.UiBold, new Point((int)(cx - cs.Width / 2f), (int)(cy - rad * 1.0f)), Xp.GroupText);
+            string capT = Lang.T(Caption);
+            Size cs = TextRenderer.MeasureText(capT, Xp.UiBold);
+            TextRenderer.DrawText(g, capT, Xp.UiBold, new Point((int)(cx - cs.Width / 2f), (int)(cy - rad * 1.0f)), Xp.GroupText);
         }
     }
 
@@ -8829,7 +9829,7 @@ namespace BunosTunner
         // ---------- informacoes (so ao clicar) ----------
         void ShowInfo()
         {
-            if (MessageBox.Show("ATENCAO: as informacoes a seguir sao PESSOAIS.\n\nVao aparecer seu IP interno e externo, enderecos MAC, provedor, cidade aproximada, nome da rede Wi-Fi e DNS.\nNao compartilhe prints desta tela.\n\nMostrar mesmo assim?", "Buno's Tunner - Dados pessoais", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+            if (Dlg.Show("ATENCAO: as informacoes a seguir sao PESSOAIS.\n\nVao aparecer seu IP interno e externo, enderecos MAC, provedor, cidade aproximada, nome da rede Wi-Fi e DNS.\nNao compartilhe prints desta tela.\n\nMostrar mesmo assim?", "Buno's Tunner - Dados pessoais", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             bInfo.Enabled = false; lblHint.Text = "Coletando informacoes..."; lblHint.Visible = true; tbInfo.Visible = false;
             System.Threading.ThreadPool.QueueUserWorkItem(delegate
             {
@@ -9214,7 +10214,7 @@ namespace BunosTunner
                     try { BeginInvoke(new Action(delegate { st.Text = r; b1.Enabled = true; if (b2 != null) b2.Enabled = true; })); } catch (Exception) { }
                 });
             };
-            b1.Click += delegate { if (confirm != null && MessageBox.Show(confirm, "Buno's Tunner - Otimizacoes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return; go(run); };
+            b1.Click += delegate { if (confirm != null && Dlg.Show(confirm, "Buno's Tunner - Otimizacoes", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning) != DialogResult.OK) return; go(run); };
             if (b2 != null) b2.Click += delegate { go(undo); };
             box.Controls.Add(g);
         }
@@ -9237,7 +10237,7 @@ namespace BunosTunner
                 for (int i = 0; i <= 4; i++) TextRenderer.DrawText(g, (mx * (4 - i) / 4).ToString("0"), f, new Point(2, r.Y + r.Height * i / 4 - 6), Xp.GraphText);
                 string[] lab = { "4K", "32K", "256K", "2M", "16M", "128M" }; int[] idx = { 0, 3, 6, 9, 12, 15 };
                 for (int i = 0; i < lab.Length; i++) TextRenderer.DrawText(g, lab[i], f, new Point(r.X + r.Width * idx[i] / 16 - 8, r.Bottom + 1), Xp.GraphText);
-                if (Ns.Count == 0) TextRenderer.DrawText(g, "ns x tamanho do bloco", f, new Point(r.X + 8, r.Y + 4), Xp.GraphText);
+                if (Ns.Count == 0) TextRenderer.DrawText(g, Lang.T("ns x tamanho do bloco"), f, new Point(r.X + 8, r.Y + 4), Xp.GraphText);
             }
             if (Ns.Count > 1)
             {
@@ -9314,7 +10314,7 @@ namespace BunosTunner
         string statusText;
         SensorForm sensForm;
         XpIconButton btnFan, btnOc, btnSpec, btnCpu, btnBench;
-        ToolTip tip = new ToolTip();
+        LTip tip = new LTip();
         // benchmark
         ComboBox cbBThr, cbBRam, cbBDrive, cbBSize, cbTheme;
         Label lblTheme, lblBRate, lblBAvg, lblBPeak, lblBTemp, lblBErr, lblBTime, lblBMsg;
@@ -9400,11 +10400,12 @@ namespace BunosTunner
             string lsv = Settings.Get("lang", "auto");
             cbLang.SelectedIndex = lsv == "pt" ? 1 : lsv == "en" ? 2 : 0;
             bar.Controls.Add(cbLang);
+            cbLang.Tag = "nolang"; cbTheme.Tag = "nolang";
             cbLang.SelectedIndexChanged += delegate
             {
                 Settings.Set("lang", cbLang.SelectedIndex == 1 ? "pt" : cbLang.SelectedIndex == 2 ? "en" : "auto");
                 Lang.Init();
-                foreach (Form f in Application.OpenForms) Lang.Apply(f, f == this ? tip : null);
+                Lang.Reapply();
             };
             cbTheme.SelectedIndexChanged += delegate
             {
@@ -9425,6 +10426,7 @@ namespace BunosTunner
             {
                 Startup.Mark("janela mostrada");
                 Lang.Apply(this, tip);
+                Lang.StartSweeper();
                 Startup.CloseSplash();
                 Startup.Save();
                 StartGpuExtras();
@@ -9443,7 +10445,7 @@ namespace BunosTunner
             if (cmb.Items.Count > 0) cmb.SelectedIndex = 0;
             else
             {
-                MessageBox.Show("Nenhuma placa de video foi detectada.\nRode como administrador e confira a pasta libs.", "Buno's Tunner");
+                Dlg.Show("Nenhuma placa de video foi detectada.\nRode como administrador e confira a pasta libs.", "Buno's Tunner");
             }
 
             timer.Interval = 1000;
@@ -9464,8 +10466,8 @@ namespace BunosTunner
 
         void Donate(string url, string nome)
         {
-            if (string.IsNullOrEmpty(url)) { MessageBox.Show("O link do " + nome + " ainda nao foi configurado.\nEm breve!", "Buno's Tunner"); return; }
-            try { Process.Start(url); } catch (Exception ex) { MessageBox.Show(ex.Message, "Buno's Tunner"); }
+            if (string.IsNullOrEmpty(url)) { Dlg.Show("O link do " + nome + " ainda nao foi configurado.\nEm breve!", "Buno's Tunner"); return; }
+            try { Process.Start(url); } catch (Exception ex) { Dlg.Show(ex.Message, "Buno's Tunner"); }
         }
 
         void ShowPage(Panel p)
@@ -9619,7 +10621,7 @@ namespace BunosTunner
             if (any)
             {
                 oc.Refresh();
-                grpOc.Title = "Overclock / limites - " + oc.Backend;
+                grpOc.Title = Lang.T("Overclock / limites - ") + oc.Backend;
                 OcSetup(slCore, txCore, rgCore, lblUCore, oc.Core, "Offset do clock do nucleo, em MHz acima do padrao");
                 OcSetup(slMem, txMem, rgMem, lblUMem, oc.Mem, "Offset do clock da memoria, em MHz");
                 OcSetup(slPow, txPow, rgPow, lblUPow, oc.Power, "Limite de potencia (TDP)");
@@ -9637,7 +10639,7 @@ namespace BunosTunner
             }
             else
             {
-                grpOc.Title = "Overclock / limites";
+                grpOc.Title = Lang.T("Overclock / limites");
                 XpSlider[] ss = { slCore, slMem, slPow, slTemp }; XpText[] tt = { txCore, txMem, txPow, txTemp }; Label[] rr = { rgCore, rgMem, rgPow, rgTemp };
                 for (int i = 0; i < 4; i++) { ss[i].Enabled = tt[i].Enabled = false; ss[i].Minimum = 0; ss[i].Maximum = 1; ss[i].Value = 0; tt[i].Text = "-"; rr[i].Text = "(indisponivel)"; }
                 string why = cur == null ? "" : cur.OcWhy;
@@ -9663,7 +10665,7 @@ namespace BunosTunner
             look.Anchor = AnchorStyles.Bottom | AnchorStyles.Left;
             g.Controls.Add(look);
             g.Resize += delegate { copy.Top = g.Height - 32; look.Top = copy.Top; };
-            look.Click += delegate { if (cur == null) { MessageBox.Show(this, "Nenhuma GPU selecionada.", "Buno's Tunner"); return; } Tpu.Open(cur.Name, true, this); };
+            look.Click += delegate { if (cur == null) { Dlg.Show(this, "Nenhuma GPU selecionada.", "Buno's Tunner"); return; } Tpu.Open(cur.Name, true, this); };
             copy.Click += delegate
             {
                 StringBuilder sb = new StringBuilder();
@@ -9910,7 +10912,7 @@ namespace BunosTunner
             if (kind == 4)
             {
                 if (drive == null) { lblBMsg.Text = "Nenhum drive disponivel para o teste de SSD."; return; }
-                if (bDurSec == 0 && MessageBox.Show("Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
+                if (bDurSec == 0 && Dlg.Show("Em 'Ate parar' o SSD recebe gravacoes continuas (gera desgaste). Continuar?", "Buno's Tunner", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) return;
             }
             BenchSave(kind);
             string gname = cur != null ? cur.Name : null;

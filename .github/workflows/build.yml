@@ -51,7 +51,7 @@ jobs:
           $out | Out-File build.log -Encoding utf8
           $out | ForEach-Object { Write-Host $_ }
           $n = 0
-          foreach ($l in $out) { if ($l -match 'error|ERRO|Copie|Nao encontrei') { $n++; if ($n -le 40) { Write-Host "::error::$l" } } }
+          foreach ($l in $out) { if ($l -match 'error|warning|ERRO|Copie|Nao encontrei') { $n++; if ($n -le 40) { Write-Host "::error::$l" } } }
           exit $code
 
       - name: Log de compilacao
