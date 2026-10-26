@@ -410,7 +410,7 @@ namespace BunoTunner
             "Estes drivers serao baixados, verificados (assinatura e hash SHA-256) e instalados:", "These drivers will be downloaded, verified (signature and SHA-256 hash) and installed:",
             "Sera criado um ponto de restauracao antes. A tela pode piscar (driver de video) e pode ser preciso reiniciar o Windows.", "A restore point will be created first. The screen may flicker (video driver) and Windows may need to restart.",
             "Abrir BunoTunner", "Open BunoTunner",
-            "Minimizar para a bandeja ao clicar no X", "Minimize to tray when clicking X",
+            "Botao - (minimizar) envia para a bandeja", "The - (minimize) button sends it to the tray",
             "Continua rodando na bandeja. Clique duas vezes no icone para abrir.", "Still running in the tray. Double-click the icon to open.",
             "Sair", "Exit",
             "Placa:", "Card:",
@@ -1633,8 +1633,8 @@ namespace BunoTunner
     {
         public static readonly string[] ThemeIds = { "luna", "aero", "dark", "neon", "steam", "retro", "gta6" };
         public static readonly string[] ThemeNames = {
-            "Luna (Windows XP)", "Frutiger Aero (Windows 7)", "Dark Mode (Escuro / AMOLED)",
-            "Neon / Cyberpunk", "Steampunk", "Vintage (Windows 95)", "GTA VI (Vice City)" };
+            "Luna (XP)", "Frutiger Aero (Win 7)", "Dark / AMOLED",
+            "Neon / Cyberpunk", "Steampunk", "Vintage (Win 95)", "GTA VI (Vice City)" };
         public static int Theme;
         public static bool Aero, Bevel, Square, Dark;
         public static int Rad = 3;
@@ -1787,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.20.2";
+        public const string Version = "v1.20.3";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2595,6 +2595,7 @@ namespace BunoTunner
     class XpForm : Form
     {
         protected const int TB = 30;
+        protected virtual void OnMinimizeClick() { WindowState = FormWindowState.Minimized; }
         Bitmap logo = Xp.Logo(1);
         bool hotClose, hotMin;
 
@@ -2658,7 +2659,7 @@ namespace BunoTunner
             if (e.Button == MouseButtons.Left && e.Y < TB)
             {
                 if (CloseR.Contains(e.Location)) { Close(); return; }
-                if (MinR.Contains(e.Location)) { WindowState = FormWindowState.Minimized; return; }
+                if (MinR.Contains(e.Location)) { OnMinimizeClick(); return; }
                 ReleaseCapture();
                 SendMessage(Handle, 0xA1, 2, 0); // WM_NCLBUTTONDOWN, HTCAPTION
             }
@@ -5297,14 +5298,14 @@ namespace BunoTunner
         {
             Panel gt = new Panel(); gt.Dock = DockStyle.Top; gt.Height = 30;
             UI.Lbl(gt, "Janela:", 4, 9, Xp.UiBold);
-            cbWin = new ComboBox(); cbWin.DropDownStyle = ComboBoxStyle.DropDownList; cbWin.Font = Xp.Ui; cbWin.SetBounds(52, 5, 80, 22);
+            cbWin = new ComboBox(); cbWin.DropDownStyle = ComboBoxStyle.DropDownList; cbWin.Font = Xp.Ui; cbWin.SetBounds(52, 5, 70, 22);
             gt.Controls.Add(cbWin);
             cbWin.Items.AddRange(new object[] { "1 min", "2 min", "5 min", "10 min", "30 min" });
             cbWin.SelectedIndex = 1;
-            chkNorm = UI.Opt(gt, "Normalizar escala", 146, 6, 130, false); chkNorm.Checked = true;
-            btnPause = UI.Btn(gt, "Pausar", 286, 3, 80, null);
+            chkNorm = UI.Opt(gt, "Normalizar escala", 128, 6, 124, false); chkNorm.Checked = true;
+            btnPause = UI.Btn(gt, "Pausar", 256, 3, 66, null);
             btnPause.Click += delegate { graph.Paused = !graph.Paused; btnPause.Text = graph.Paused ? "Continuar" : "Pausar"; graph.Invalidate(); };
-            UI.Btn(gt, "Limpar historico", 372, 3, 110, delegate { foreach (Series s in graph.Items) s.V.Clear(); graph.Invalidate(); });
+            UI.Btn(gt, "Limpar historico", 326, 3, 112, delegate { foreach (Series s in graph.Items) s.V.Clear(); graph.Invalidate(); });
             tip.SetToolTip(chkNorm, "Ligado: cada linha usa a propria escala (0-100%). Desligado: mesma escala para todas.");
             tip.SetToolTip(graph, "Passe o mouse sobre o grafico para ver os valores de cada instante");
             graph.Dock = DockStyle.Fill;
@@ -10767,13 +10768,13 @@ namespace BunoTunner
         {
             XpGroup g = new XpGroup(); g.Title = "Atualizar drivers de todos os dispositivos"; g.SetBounds(0, 0, 650, 246);
             Label d = UI.Lbl(g, "Analisa todos os dispositivos do PC e procura no Windows Update os drivers mais novos. Antes de instalar, cria um ponto de restauracao e confere a assinatura digital e o hash SHA-256 dos arquivos baixados; se algum estiver alterado, nada e instalado.", 12, 22, Xp.Ui, Xp.Dim);
-            d.AutoSize = false; d.SetBounds(12, 22, 500, 44);
-            XpButton bGo = UI.Btn(g, "Atualizar drivers", 524, 22, 112, null);
-            XpButton bScan = UI.Btn(g, "So verificar", 524, 50, 112, null);
-            bGo.Height = 24;
-            XpProgress pb = new XpProgress(); pb.SetBounds(12, 72, 624, 14); g.Controls.Add(pb);
+            d.AutoSize = false; d.SetBounds(12, 22, 624, 44);
+            XpButton bGo = UI.Btn(g, "Atualizar drivers", 12, 70, 150, null);
+            XpButton bScan = UI.Btn(g, "So verificar", 170, 70, 120, null);
+            bGo.Height = 24; bScan.Height = 24;
+            XpProgress pb = new XpProgress(); pb.SetBounds(300, 75, 336, 14); g.Controls.Add(pb);
             TextBox log = new TextBox(); log.Multiline = true; log.ReadOnly = true; log.ScrollBars = ScrollBars.Vertical; log.WordWrap = true;
-            log.Font = Xp.Ui; log.BackColor = Xp.EditBg; log.ForeColor = Xp.Text; log.SetBounds(12, 92, 624, 144);
+            log.Font = Xp.Ui; log.BackColor = Xp.EditBg; log.ForeColor = Xp.Text; log.SetBounds(12, 100, 624, 138);
             log.Text = "Clique em 'Atualizar drivers' para analisar e instalar, ou em 'So verificar' para apenas listar o que esta desatualizado.";
             g.Controls.Add(log);
             Timer anim = new Timer(); anim.Interval = 60; anim.Tick += delegate { pb.Step(); };
@@ -11028,7 +11029,7 @@ namespace BunoTunner
             TaskPane left = new TaskPane(); left.Dock = DockStyle.Left; left.Width = 72;
             Panel bar = new Panel(); bar.Dock = DockStyle.Bottom; bar.Height = 30; bar.BackColor = Xp.Face;
             status.AutoSize = false; status.BackColor = Color.Transparent; status.TextAlign = ContentAlignment.MiddleLeft;
-            statusText = SensorHub.Status(); status.SetBounds(6, 7, 300, 16); status.Text = statusText;
+            statusText = SensorHub.Status(); status.SetBounds(6, 7, 250, 16); status.Text = statusText;
             bar.Controls.Add(status);
 
             // doacoes (canto inferior direito)
@@ -11065,13 +11066,13 @@ namespace BunoTunner
             cmb.DropDownStyle = ComboBoxStyle.DropDownList; cmb.Font = Xp.Ui;
             cmb.SetBounds(95, 2, 330, 22);
             right.Controls.Add(cmb);
-            lblTheme = UI.Lbl(bar, "Tema:", 312, 8, Xp.UiBold);
-            cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(356, 4, 150, 22); cbTheme.DropDownWidth = 230;
+            lblTheme = UI.Lbl(bar, "Tema:", 264, 8, Xp.UiBold);
+            cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(306, 4, 176, 22); cbTheme.DropDownWidth = 230;
             cbTheme.Items.AddRange(Xp.ThemeNames);
             cbTheme.SelectedIndex = Xp.Theme;
             bar.Controls.Add(cbTheme);
-            UI.Lbl(bar, "Idioma:", 514, 8, Xp.UiBold);
-            ComboBox cbLang = new ComboBox(); cbLang.DropDownStyle = ComboBoxStyle.DropDownList; cbLang.Font = Xp.Ui; cbLang.SetBounds(566, 4, 118, 22); cbLang.DropDownWidth = 170;
+            UI.Lbl(bar, "Idioma:", 492, 8, Xp.UiBold);
+            ComboBox cbLang = new ComboBox(); cbLang.DropDownStyle = ComboBoxStyle.DropDownList; cbLang.Font = Xp.Ui; cbLang.SetBounds(544, 4, 140, 22); cbLang.DropDownWidth = 170;
             cbLang.Items.AddRange(new object[] { "Auto (Windows)", "Portugu\u00EAs (Brasil)", "English" });
             string lsv = Settings.Get("lang", "auto");
             cbLang.SelectedIndex = lsv == "pt" ? 1 : lsv == "en" ? 2 : 0;
@@ -11900,7 +11901,7 @@ namespace BunoTunner
         }
 
         // ---------------- bandeja do sistema ----------------
-        NotifyIcon tray; bool reallyExit, trayTold;
+        NotifyIcon tray; bool trayTold;
         void InitTray()
         {
             try
@@ -11909,18 +11910,29 @@ namespace BunoTunner
                 tray.Icon = Icon; tray.Text = "BunoTunner";
                 ContextMenuStrip cm = new ContextMenuStrip();
                 cm.Items.Add("Abrir BunoTunner", null, delegate { ShowFromTray(); });
-                ToolStripMenuItem mi = new ToolStripMenuItem("Minimizar para a bandeja ao clicar no X");
+                ToolStripMenuItem mi = new ToolStripMenuItem("Botao - (minimizar) envia para a bandeja");
                 mi.CheckOnClick = true; mi.Checked = Settings.Get("tray", "1") == "1";
                 mi.CheckedChanged += delegate { Settings.Set("tray", mi.Checked ? "1" : "0"); };
                 cm.Items.Add(mi);
                 cm.Items.Add(new ToolStripSeparator());
-                cm.Items.Add("Sair", null, delegate { reallyExit = true; Close(); });
+                cm.Items.Add("Sair", null, delegate { Close(); });
                 Lang.Menu(cm);
                 tray.ContextMenuStrip = cm;
                 tray.DoubleClick += delegate { ShowFromTray(); };
                 tray.Visible = true;
             }
             catch (Exception) { tray = null; }
+        }
+        // botao "-" da janela: vai para a bandeja (se a opcao estiver ligada); o X fecha o programa
+        protected override void OnMinimizeClick()
+        {
+            if (tray == null || Settings.Get("tray", "1") != "1") { base.OnMinimizeClick(); return; }
+            Hide();
+            if (!trayTold)
+            {
+                trayTold = true;
+                try { tray.ShowBalloonTip(2500, "BunoTunner", Lang.T("Continua rodando na bandeja. Clique duas vezes no icone para abrir."), ToolTipIcon.Info); } catch (Exception) { }
+            }
         }
         void ShowFromTray()
         {
@@ -11931,17 +11943,6 @@ namespace BunoTunner
 
         void OnClosing(object s, FormClosingEventArgs e)
         {
-            if (!reallyExit && tray != null && e.CloseReason == CloseReason.UserClosing && Settings.Get("tray", "1") == "1")
-            {
-                e.Cancel = true;
-                Hide();
-                if (!trayTold)
-                {
-                    trayTold = true;
-                    try { tray.ShowBalloonTip(2500, "BunoTunner", Lang.T("Continua rodando na bandeja. Clique duas vezes no icone para abrir."), ToolTipIcon.Info); } catch (Exception) { }
-                }
-                return;
-            }
             if (tray != null) { try { tray.Visible = false; tray.Dispose(); } catch (Exception) { } tray = null; }
             Bench.Stop = true;
             timer.Stop();
