@@ -1787,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.21.1";
+        public const string Version = "v1.21.2";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2455,21 +2455,37 @@ namespace BunoTunner
                     }
                 case "health":
                     {
-                        // HDD visto de cima: caixa metalica, prato, braco da cabeca e LED
-                        RectangleF body = new RectangleF(ic.X, ic.Y + h * 0.06f, w, h * 0.88f);
+                        // HDD de cima com faixa "SMART" + check verde (saude ok)
+                        Func<float, float> ux = delegate(float u) { return ic.X + u / 100f * w; };
+                        Func<float, float> uy = delegate(float v) { return ic.Y + v / 100f * h; };
+                        RectangleF body = new RectangleF(ux(6), uy(10), w * 0.88f, h * 0.8f);
                         using (GraphicsPath bp2 = Xp.Round(Rectangle.Round(body), 3))
                         {
-                            using (LinearGradientBrush bg = new LinearGradientBrush(body, Color.FromArgb(176, 184, 198), Color.FromArgb(84, 92, 108), 90f)) g.FillPath(bg, bp2);
-                            using (Pen bo = new Pen(Color.FromArgb(30, 36, 48), 1.2f)) g.DrawPath(bo, bp2);
+                            using (LinearGradientBrush bg = new LinearGradientBrush(body, Color.FromArgb(207, 214, 226), Color.FromArgb(93, 103, 121), 90f)) g.FillPath(bg, bp2);
+                            using (Pen bo = new Pen(Color.FromArgb(43, 51, 71), 1.4f)) g.DrawPath(bo, bp2);
                         }
-                        float pr = h * 0.33f, pcx = body.X + w * 0.40f, pcy = body.Y + body.Height * 0.5f;
-                        using (LinearGradientBrush pl = new LinearGradientBrush(new RectangleF(pcx - pr, pcy - pr, pr * 2, pr * 2), Color.FromArgb(246, 248, 252), Color.FromArgb(128, 138, 156), 45f)) g.FillEllipse(pl, pcx - pr, pcy - pr, pr * 2, pr * 2);
-                        using (Pen pro = new Pen(Color.FromArgb(70, 80, 98), 1f)) { g.DrawEllipse(pro, pcx - pr, pcy - pr, pr * 2, pr * 2); g.DrawEllipse(pro, pcx - pr * 0.62f, pcy - pr * 0.62f, pr * 1.24f, pr * 1.24f); }
-                        g.FillEllipse(Brushes.DimGray, pcx - pr * 0.2f, pcy - pr * 0.2f, pr * 0.4f, pr * 0.4f);
-                        float ax = body.Right - w * 0.1f, ay = body.Bottom - body.Height * 0.14f;
-                        using (Pen arm = new Pen(Color.FromArgb(40, 46, 60), Math.Max(2f, w * 0.06f))) { arm.StartCap = LineCap.Round; arm.EndCap = LineCap.Round; g.DrawLine(arm, ax, ay, pcx + pr * 0.45f, pcy + pr * 0.25f); }
-                        g.FillEllipse(Brushes.Gold, ax - 2.2f, ay - 2.2f, 4.4f, 4.4f);
-                        using (SolidBrush led = new SolidBrush(Color.FromArgb(60, 230, 90))) g.FillEllipse(led, body.X + w * 0.06f, body.Bottom - body.Height * 0.16f, w * 0.07f, w * 0.07f);
+                        float pcx = ux(44), pcy = uy(44), pr = w * 0.30f;
+                        using (LinearGradientBrush pl = new LinearGradientBrush(new RectangleF(pcx - pr, pcy - pr, pr * 2, pr * 2), Color.FromArgb(246, 248, 252), Color.FromArgb(150, 160, 178), 45f)) g.FillEllipse(pl, pcx - pr, pcy - pr, pr * 2, pr * 2);
+                        using (Pen pro = new Pen(Color.FromArgb(74, 84, 104), 1f)) { g.DrawEllipse(pro, pcx - pr, pcy - pr, pr * 2, pr * 2); g.DrawEllipse(pro, pcx - pr * 0.66f, pcy - pr * 0.66f, pr * 1.32f, pr * 1.32f); }
+                        g.FillEllipse(Brushes.DimGray, pcx - pr * 0.16f, pcy - pr * 0.16f, pr * 0.32f, pr * 0.32f);
+                        float ax = ux(86), ay = uy(70);
+                        using (Pen arm = new Pen(Color.FromArgb(43, 51, 71), Math.Max(2f, w * 0.05f))) { arm.StartCap = LineCap.Round; arm.EndCap = LineCap.Round; g.DrawLine(arm, ax, ay, pcx + pr * 0.5f, pcy + pr * 0.25f); }
+                        g.FillEllipse(Brushes.Goldenrod, ax - 2.2f, ay - 2.2f, 4.4f, 4.4f);
+                        RectangleF band = new RectangleF(ux(10), uy(62), w * 0.80f, h * 0.26f);
+                        using (GraphicsPath bnd = Xp.Round(Rectangle.Round(band), 2))
+                        {
+                            using (SolidBrush bb = new SolidBrush(Color.FromArgb(15, 26, 46))) g.FillPath(bb, bnd);
+                            using (Pen bw = new Pen(Color.White, 1f)) g.DrawPath(bw, bnd);
+                        }
+                        using (Font sf = new Font("Arial", Math.Max(6f, band.Height * 0.52f), FontStyle.Bold, GraphicsUnit.Pixel))
+                        using (SolidBrush gr = new SolidBrush(Color.FromArgb(61, 255, 122)))
+                        {
+                            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+                            StringFormat sfm = new StringFormat(); sfm.Alignment = StringAlignment.Center; sfm.LineAlignment = StringAlignment.Center;
+                            g.DrawString("SMART", sf, gr, new RectangleF(band.X, band.Y, band.Width * 0.66f, band.Height), sfm);
+                            sfm.Dispose();
+                        }
+                        using (Pen ck = new Pen(Color.FromArgb(61, 255, 122), Math.Max(1.6f, w * 0.045f))) { ck.StartCap = LineCap.Round; ck.EndCap = LineCap.Round; ck.LineJoin = LineJoin.Round; g.DrawLines(ck, new PointF[] { new PointF(band.X + band.Width * 0.72f, band.Y + band.Height * 0.55f), new PointF(band.X + band.Width * 0.82f, band.Y + band.Height * 0.76f), new PointF(band.X + band.Width * 0.96f, band.Y + band.Height * 0.24f) }); }
                         break;
                     }
                 case "opt":
