@@ -1787,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.21.0";
+        public const string Version = "v1.21.1";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2283,14 +2283,25 @@ namespace BunoTunner
                     }
                 case "oc":
                     {
-                        RectangleF arc = new RectangleF(ic.X, ic.Y + h * 0.18f, w, w);
-                        float acy = arc.Y + w / 2f;
-                        using (Pen a1 = new Pen(Color.FromArgb(40, 170, 40), 3.5f)) g.DrawArc(a1, arc, 180, 60);
-                        using (Pen a2 = new Pen(Color.FromArgb(240, 170, 0), 3.5f)) g.DrawArc(a2, arc, 240, 60);
-                        using (Pen a3 = new Pen(Color.FromArgb(220, 40, 30), 3.5f)) g.DrawArc(a3, arc, 300, 60);
-                        using (Pen nd = new Pen(Color.FromArgb(30, 30, 30), 2f)) g.DrawLine(nd, cx, acy, cx + w * 0.26f, acy - w * 0.30f);
-                        using (SolidBrush hub = new SolidBrush(Color.FromArgb(30, 30, 30))) g.FillEllipse(hub, cx - 3, acy - 3, 6, 6);
-                        using (SolidBrush bs = new SolidBrush(Color.FromArgb(0, 60, 116))) g.FillRectangle(bs, ic.X + w * 0.1f, acy + 4, w * 0.8f, 3);
+                        // display digital de clock: "2850 MHz +"
+                        RectangleF scr = new RectangleF(ic.X - 1, ic.Y + h * 0.16f, w + 2, h * 0.68f);
+                        using (GraphicsPath sp = Xp.Round(Rectangle.Round(scr), 3))
+                        {
+                            using (LinearGradientBrush sg = new LinearGradientBrush(scr, Color.FromArgb(74, 84, 104), Color.FromArgb(27, 33, 48), 90f)) g.FillPath(sg, sp);
+                            using (Pen so = new Pen(Color.FromArgb(15, 20, 32), 1.4f)) g.DrawPath(so, sp);
+                        }
+                        RectangleF lcd = new RectangleF(scr.X + w * 0.09f, scr.Y + scr.Height * 0.14f, scr.Width - w * 0.18f, scr.Height * 0.72f);
+                        using (SolidBrush lb = new SolidBrush(Color.FromArgb(7, 34, 15))) g.FillRectangle(lb, lcd);
+                        using (Font df = new Font("Consolas", Math.Max(7f, lcd.Height * 0.52f), FontStyle.Bold, GraphicsUnit.Pixel))
+                        using (Font uf = new Font("Consolas", Math.Max(5f, lcd.Height * 0.26f), FontStyle.Bold, GraphicsUnit.Pixel))
+                        using (SolidBrush gb = new SolidBrush(Color.FromArgb(61, 255, 122)))
+                        {
+                            g.TextRenderingHint = TextRenderingHint.AntiAlias;
+                            StringFormat cf = new StringFormat(); cf.Alignment = StringAlignment.Center; cf.LineAlignment = StringAlignment.Center;
+                            g.DrawString("2850", df, gb, new RectangleF(lcd.X, lcd.Y - lcd.Height * 0.06f, lcd.Width, lcd.Height * 0.66f), cf);
+                            g.DrawString("MHz +", uf, gb, new RectangleF(lcd.X, lcd.Y + lcd.Height * 0.58f, lcd.Width, lcd.Height * 0.4f), cf);
+                        }
+                        g.FillPolygon(Brushes.OrangeRed, new PointF[] { new PointF(lcd.Right - w * 0.04f, lcd.Y + 1), new PointF(lcd.Right - w * 0.16f, lcd.Y + 1), new PointF(lcd.Right - w * 0.10f, lcd.Y - h * 0.1f) });
                         break;
                     }
                 case "gpu":

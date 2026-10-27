@@ -277,3 +277,6 @@ CORRECOES v1.7.1
 
 === v1.21.0 ===
 - Icones do painel lateral: Otimizacoes do Windows agora usa o simbolo do Windows XP (bandeira de 4 cores), Saude do armazenamento usa um HDD, e Benchmark usa uma chama de fogo.
+
+=== v1.21.1 ===
+- Icone do Overclock: display digital "2850 MHz +".
