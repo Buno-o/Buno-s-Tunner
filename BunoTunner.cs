@@ -1787,7 +1787,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.20.3";
+        public const string Version = "v1.21.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2213,6 +2213,30 @@ namespace BunoTunner
             }
         }
 
+        // ponto da bandeira ondulada (u, v em 0..1)
+        static PointF FlagPt(Rectangle ic, float u, float v)
+        {
+            float w = ic.Width, h = ic.Height;
+            float wave = (float)Math.Sin(u * Math.PI * 1.7 + v * 0.6) * h * 0.07f;
+            return new PointF(ic.X + w * (0.04f + 0.92f * u) + (v - 0.5f) * w * 0.06f, ic.Y + h * (0.10f + 0.78f * v) + wave);
+        }
+        // pontos de Bezier da chama (inner = 0 externa, 1 interna menor)
+        static PointF[] FlamePts(Rectangle ic, float inner)
+        {
+            float[] c = { 0.50f, 0.98f,  0.12f, 0.98f,  0.06f, 0.62f,  0.28f, 0.40f,  0.30f, 0.55f,  0.38f, 0.58f,  0.42f, 0.50f,
+                          0.40f, 0.30f,  0.50f, 0.12f,  0.58f, 0.00f,  0.62f, 0.22f,  0.82f, 0.30f,  0.88f, 0.58f,  0.94f, 0.84f,  0.78f, 0.98f };
+            PointF[] r = new PointF[15];
+            // ordem: P0, c1, c2, P1, c3, c4, P2, c5, c6, P3, c7, c8, P4, c9, c10 (o ultimo segmento fecha em P0)
+            float k = inner > 0 ? 0.52f : 1f, ox = 0.5f, oy = 0.98f;
+            for (int i = 0; i < 15; i++)
+            {
+                float x = c[i * 2], y = c[i * 2 + 1];
+                if (inner > 0) { x = ox + (x - ox) * k; y = oy + (y - oy) * k - 0.02f; }
+                r[i] = new PointF(ic.X + x * ic.Width, ic.Y + y * ic.Height);
+            }
+            return r;
+        }
+
         static void Draw(Graphics g, string kind, Rectangle ic)
         {
             float w = ic.Width, h = ic.Height, cx = ic.X + w / 2f, cy = ic.Y + h / 2f, rad = Math.Min(w, h) / 2f;
@@ -2348,22 +2372,22 @@ namespace BunoTunner
                     }
                 case "bench":
                     {
-                        float sr = rad * 0.82f, scy = cy + rad * 0.14f;
-                        using (SolidBrush btn = new SolidBrush(Color.FromArgb(120, 130, 145))) g.FillRectangle(btn, cx - w * 0.08f, ic.Y, w * 0.16f, h * 0.14f);
-                        using (Pen sp = new Pen(Color.FromArgb(120, 130, 145), 2f)) g.DrawLine(sp, cx + sr * 0.7f, scy - sr * 0.75f, cx + sr * 0.95f, scy - sr * 0.95f);
-                        RectangleF fr = new RectangleF(cx - sr, scy - sr, sr * 2, sr * 2);
-                        using (LinearGradientBrush face = new LinearGradientBrush(fr, Xp.Hi, Color.FromArgb(196, 212, 235), 90f)) g.FillEllipse(face, fr);
-                        using (Pen rim = new Pen(Color.FromArgb(40, 80, 160), 2f)) g.DrawEllipse(rim, fr);
-                        using (Pen tk = new Pen(Color.FromArgb(90, 100, 120), 1f))
-                            for (int i = 0; i < 12; i++)
-                            {
-                                double a = i * Math.PI / 6;
-                                float sn = (float)Math.Sin(a), cs = (float)Math.Cos(a);
-                                g.DrawLine(tk, cx + sn * sr * 0.78f, scy - cs * sr * 0.78f, cx + sn * sr * 0.92f, scy - cs * sr * 0.92f);
-                            }
-                        using (Pen arcp = new Pen(Color.FromArgb(230, 70, 40), 2.2f)) g.DrawArc(arcp, cx - sr * 0.62f, scy - sr * 0.62f, sr * 1.24f, sr * 1.24f, -90, 210);
-                        using (Pen hand = new Pen(Color.FromArgb(200, 30, 30), 1.8f)) g.DrawLine(hand, cx, scy, cx + sr * 0.5f, scy - sr * 0.45f);
-                        g.FillEllipse(Brushes.DimGray, cx - 2, scy - 2, 4, 4);
+                        // fogo: chama externa (vermelho/laranja) e chama interna (amarelo)
+                        PointF[] fo = FlamePts(ic, 0f);
+                        using (GraphicsPath fp = new GraphicsPath())
+                        {
+                            fp.AddBezier(fo[0], fo[1], fo[2], fo[3]); fp.AddBezier(fo[3], fo[4], fo[5], fo[6]); fp.AddBezier(fo[6], fo[7], fo[8], fo[9]);
+                            fp.AddBezier(fo[9], fo[10], fo[11], fo[12]); fp.AddBezier(fo[12], fo[13], fo[14], fo[0]); fp.CloseFigure();
+                            using (LinearGradientBrush fg = new LinearGradientBrush(new RectangleF(ic.X, ic.Y, w, h), Color.FromArgb(214, 40, 20), Color.FromArgb(255, 160, 0), 90f)) g.FillPath(fg, fp);
+                            using (Pen fpn = new Pen(Color.FromArgb(150, 40, 10), 1f)) g.DrawPath(fpn, fp);
+                        }
+                        PointF[] fi = FlamePts(ic, 1f);
+                        using (GraphicsPath fp2 = new GraphicsPath())
+                        {
+                            fp2.AddBezier(fi[0], fi[1], fi[2], fi[3]); fp2.AddBezier(fi[3], fi[4], fi[5], fi[6]); fp2.AddBezier(fi[6], fi[7], fi[8], fi[9]);
+                            fp2.AddBezier(fi[9], fi[10], fi[11], fi[12]); fp2.AddBezier(fi[12], fi[13], fi[14], fi[0]); fp2.CloseFigure();
+                            using (LinearGradientBrush fg2 = new LinearGradientBrush(new RectangleF(ic.X, ic.Y + h * 0.35f, w, h * 0.65f), Color.FromArgb(255, 214, 40), Color.FromArgb(255, 248, 190), 90f)) g.FillPath(fg2, fp2);
+                        }
                         break;
                     }
                 case "cpuoc":
@@ -2420,24 +2444,41 @@ namespace BunoTunner
                     }
                 case "health":
                     {
-                        RectangleF body = new RectangleF(ic.X, ic.Y + h * 0.1f, w * 0.86f, h * 0.7f);
-                        using (LinearGradientBrush bg = new LinearGradientBrush(body, Color.FromArgb(120, 128, 142), Color.FromArgb(52, 58, 70), 90f)) g.FillRectangle(bg, body);
-                        g.DrawRectangle(Pens.Black, body.X, body.Y, body.Width, body.Height);
-                        using (SolidBrush lb = new SolidBrush(Color.FromArgb(70, 140, 220))) g.FillRectangle(lb, body.X + w * 0.08f, body.Y + body.Height * 0.2f, w * 0.4f, body.Height * 0.4f);
-                        RectangleF bd = new RectangleF(ic.X + w * 0.5f, ic.Y + h * 0.42f, w * 0.5f, h * 0.5f);
-                        g.FillEllipse(Brushes.White, bd.X - 1, bd.Y - 1, bd.Width + 2, bd.Height + 2);
-                        using (SolidBrush gr = new SolidBrush(Color.FromArgb(34, 170, 70))) g.FillEllipse(gr, bd);
-                        g.FillRectangle(Brushes.White, bd.X + bd.Width * 0.42f, bd.Y + bd.Height * 0.2f, bd.Width * 0.16f, bd.Height * 0.6f);
-                        g.FillRectangle(Brushes.White, bd.X + bd.Width * 0.2f, bd.Y + bd.Height * 0.42f, bd.Width * 0.6f, bd.Height * 0.16f);
+                        // HDD visto de cima: caixa metalica, prato, braco da cabeca e LED
+                        RectangleF body = new RectangleF(ic.X, ic.Y + h * 0.06f, w, h * 0.88f);
+                        using (GraphicsPath bp2 = Xp.Round(Rectangle.Round(body), 3))
+                        {
+                            using (LinearGradientBrush bg = new LinearGradientBrush(body, Color.FromArgb(176, 184, 198), Color.FromArgb(84, 92, 108), 90f)) g.FillPath(bg, bp2);
+                            using (Pen bo = new Pen(Color.FromArgb(30, 36, 48), 1.2f)) g.DrawPath(bo, bp2);
+                        }
+                        float pr = h * 0.33f, pcx = body.X + w * 0.40f, pcy = body.Y + body.Height * 0.5f;
+                        using (LinearGradientBrush pl = new LinearGradientBrush(new RectangleF(pcx - pr, pcy - pr, pr * 2, pr * 2), Color.FromArgb(246, 248, 252), Color.FromArgb(128, 138, 156), 45f)) g.FillEllipse(pl, pcx - pr, pcy - pr, pr * 2, pr * 2);
+                        using (Pen pro = new Pen(Color.FromArgb(70, 80, 98), 1f)) { g.DrawEllipse(pro, pcx - pr, pcy - pr, pr * 2, pr * 2); g.DrawEllipse(pro, pcx - pr * 0.62f, pcy - pr * 0.62f, pr * 1.24f, pr * 1.24f); }
+                        g.FillEllipse(Brushes.DimGray, pcx - pr * 0.2f, pcy - pr * 0.2f, pr * 0.4f, pr * 0.4f);
+                        float ax = body.Right - w * 0.1f, ay = body.Bottom - body.Height * 0.14f;
+                        using (Pen arm = new Pen(Color.FromArgb(40, 46, 60), Math.Max(2f, w * 0.06f))) { arm.StartCap = LineCap.Round; arm.EndCap = LineCap.Round; g.DrawLine(arm, ax, ay, pcx + pr * 0.45f, pcy + pr * 0.25f); }
+                        g.FillEllipse(Brushes.Gold, ax - 2.2f, ay - 2.2f, 4.4f, 4.4f);
+                        using (SolidBrush led = new SolidBrush(Color.FromArgb(60, 230, 90))) g.FillEllipse(led, body.X + w * 0.06f, body.Bottom - body.Height * 0.16f, w * 0.07f, w * 0.07f);
                         break;
                     }
                 case "opt":
                     {
-                        using (Pen hp = new Pen(Color.FromArgb(150, 100, 50), 3f)) { hp.StartCap = LineCap.Round; hp.EndCap = LineCap.Round; g.DrawLine(hp, ic.Right - w * 0.1f, ic.Y + h * 0.05f, ic.X + w * 0.42f, ic.Y + h * 0.58f); }
-                        PointF[] br = { new PointF(ic.X + w * 0.3f, ic.Y + h * 0.5f), new PointF(ic.X + w * 0.56f, ic.Y + h * 0.62f), new PointF(ic.X + w * 0.4f, ic.Bottom), new PointF(ic.X + w * 0.02f, ic.Bottom - h * 0.1f) };
-                        using (LinearGradientBrush bb = new LinearGradientBrush(new RectangleF(ic.X, ic.Y + h * 0.5f, w * 0.6f, h * 0.5f), Color.FromArgb(240, 200, 70), Color.FromArgb(200, 140, 30), 45f)) g.FillPolygon(bb, br);
-                        g.DrawPolygon(Pens.SaddleBrown, br);
-                        using (Pen sp = new Pen(Color.FromArgb(255, 255, 255), 1.6f)) { g.DrawLine(sp, ic.X + w * 0.78f, ic.Y + h * 0.62f, ic.X + w * 0.78f, ic.Y + h * 0.84f); g.DrawLine(sp, ic.X + w * 0.67f, ic.Y + h * 0.73f, ic.X + w * 0.89f, ic.Y + h * 0.73f); }
+                        // simbolo do Windows XP: bandeira ondulada com quatro paineis (vermelho, verde, azul, amarelo)
+                        Color[] fc = { Color.FromArgb(232, 66, 36), Color.FromArgb(118, 184, 0), Color.FromArgb(36, 122, 214), Color.FromArgb(255, 188, 0) };
+                        for (int pi = 0; pi < 4; pi++)
+                        {
+                            float u0 = (pi % 2 == 0) ? 0f : 0.53f, u1 = (pi % 2 == 0) ? 0.47f : 1f, v0 = (pi < 2) ? 0f : 0.53f, v1 = (pi < 2) ? 0.47f : 1f;
+                            List<PointF> poly = new List<PointF>();
+                            int ns = 8;
+                            for (int k = 0; k <= ns; k++) poly.Add(FlagPt(ic, u0 + (u1 - u0) * k / ns, v0));
+                            for (int k = 0; k <= ns; k++) poly.Add(FlagPt(ic, u1, v0 + (v1 - v0) * k / ns));
+                            for (int k = ns; k >= 0; k--) poly.Add(FlagPt(ic, u0 + (u1 - u0) * k / ns, v1));
+                            for (int k = ns; k >= 0; k--) poly.Add(FlagPt(ic, u0, v0 + (v1 - v0) * k / ns));
+                            PointF[] pa = poly.ToArray();
+                            RectangleF pb = new RectangleF(ic.X, ic.Y, w, h);
+                            using (LinearGradientBrush fb2 = new LinearGradientBrush(pb, ControlPaint.Light(fc[pi], 0.35f), ControlPaint.Dark(fc[pi], 0.12f), 70f)) g.FillPolygon(fb2, pa);
+                            using (Pen fo = new Pen(Color.FromArgb(90, 20, 20, 20), 0.8f)) g.DrawPolygon(fo, pa);
+                        }
                         break;
                     }
                 case "ssd":
