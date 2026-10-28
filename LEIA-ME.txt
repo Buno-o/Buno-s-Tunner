@@ -293,3 +293,6 @@ CORRECOES v1.7.1
 
 === v1.22.2 ===
 - Latencia da memoria refeita seguindo a documentacao do AIDA64: um unico nucleo/thread, leituras dependentes, paginas de 4 KB, acesso aleatorio com passo minimo de 128 bytes (evita o prefetcher da linha adjacente) e "block-random" (salta aleatoriamente dentro de blocos de 4 MB, menores que a janela do TLB, e depois passa para outro bloco do buffer de 256 MB).
+
+=== v1.22.3 ===
+- Latencia da memoria: blocos do teste block-random reduzidos de 4 MB para 256 KB (64 paginas, cabem na TLB de 1o nivel) para chegar ainda mais perto do AIDA64.

@@ -1790,7 +1790,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.22.2";
+        public const string Version = "v1.22.3";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -8815,7 +8815,7 @@ namespace BunoTunner
         // prefetcher da linha adjacente) e "block-random": salta aleatoriamente dentro de um bloco menor que a janela do TLB
         // (limita a penalidade de falha de TLB), percorre o bloco e so entao passa para outro bloco do buffer.
         // Mede o tempo medio (ns) de uma leitura em um buffer de 'bytes'.
-        const int LatBlock = 4 * 1024 * 1024;   // bloco: 1024 paginas de 4 KB (cabe na TLB de 2o nivel)
+        const int LatBlock = 256 * 1024;   // bloco: 64 paginas de 4 KB (cabe na TLB de 1o nivel, sem custo de TLB de 2o nivel)
         static double LatMeasure(long bytes)
         {
             int slots = (int)(bytes / 128);                       // posicoes de 128 B
