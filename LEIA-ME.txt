@@ -296,3 +296,6 @@ CORRECOES v1.7.1
 
 === v1.22.3 ===
 - Latencia da memoria: blocos do teste block-random reduzidos de 4 MB para 256 KB (64 paginas, cabem na TLB de 1o nivel) para chegar ainda mais perto do AIDA64.
+
+=== v1.22.4 ===
+- Latencia da memoria: bloco do teste ajustado para 2 MB (4 MB dava 69 ns e 256 KB dava 55 ns, contra 65 ns do AIDA64 no PC de teste).
