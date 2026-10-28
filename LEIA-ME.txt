@@ -290,3 +290,6 @@ CORRECOES v1.7.1
 
 === v1.22.1 ===
 - Latencia da memoria: o teste agora se comporta como o AIDA64. A ordem continua aleatoria, mas cada pagina de 4 KB e percorrida por inteiro antes de saltar para outra, o que tira a falha de TLB (traducao de enderecos) da conta (antes ela somava varios ns e o valor ficava bem acima do AIDA64). O teste tambem fica fixo em um nucleo para nao oscilar.
+
+=== v1.22.2 ===
+- Latencia da memoria refeita seguindo a documentacao do AIDA64: um unico nucleo/thread, leituras dependentes, paginas de 4 KB, acesso aleatorio com passo minimo de 128 bytes (evita o prefetcher da linha adjacente) e "block-random" (salta aleatoriamente dentro de blocos de 4 MB, menores que a janela do TLB, e depois passa para outro bloco do buffer de 256 MB).

@@ -1790,7 +1790,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.22.1";
+        public const string Version = "v1.22.2";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -8810,31 +8810,36 @@ namespace BunoTunner
         [DllImport("kernel32.dll")] static extern IntPtr SetThreadAffinityMask(IntPtr h, IntPtr mask);
         [DllImport("kernel32.dll")] static extern IntPtr GetCurrentThread();
 
-        // tempo medio (ns) de um acesso dependente a um bloco de 'bytes'. Como no AIDA64, a ordem e aleatoria entre as paginas de 4 KB
-        // e entre as linhas de 64 B dentro de cada pagina, mas uma pagina e percorrida por inteiro antes de saltar para outra:
-        // assim a falha de TLB (traducao de endereco) quase nao entra na conta e o resultado e a latencia da DRAM em si.
+        // Latencia como descrita na documentacao do AIDA64: um unico nucleo/thread, leituras dependentes (o endereco da proxima
+        // leitura vem do dado da anterior), paginas de 4 KB, acesso ALEATORIO com passo minimo de 128 bytes (evita o efeito do
+        // prefetcher da linha adjacente) e "block-random": salta aleatoriamente dentro de um bloco menor que a janela do TLB
+        // (limita a penalidade de falha de TLB), percorre o bloco e so entao passa para outro bloco do buffer.
+        // Mede o tempo medio (ns) de uma leitura em um buffer de 'bytes'.
+        const int LatBlock = 4 * 1024 * 1024;   // bloco: 1024 paginas de 4 KB (cabe na TLB de 2o nivel)
         static double LatMeasure(long bytes)
         {
-            int lines = (int)(bytes / 64);
-            int[] a = new int[lines * 16];
-            int[] seq = new int[lines];
-            int pages = Math.Max(1, lines / 64), perPage = lines / pages;
-            int[] pg = new int[pages];
-            for (int i = 0; i < pages; i++) pg[i] = i;
+            int slots = (int)(bytes / 128);                       // posicoes de 128 B
+            int blockSlots = (int)(Math.Min(bytes, (long)LatBlock) / 128);
+            int blocks = Math.Max(1, slots / blockSlots);
+            int[] a = new int[bytes / 4];                         // cada posicao guarda o indice (em ints) da proxima
+            int[] seq = new int[slots];
+            int[] bo = new int[blocks];
+            for (int i = 0; i < blocks; i++) bo[i] = i;
             Random rnd = new Random(12345);
-            for (int i = pages - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = pg[i]; pg[i] = pg[j]; pg[j] = tmp; }
-            int[] ln = new int[perPage];
+            for (int i = blocks - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = bo[i]; bo[i] = bo[j]; bo[j] = tmp; }
+            int[] pos = new int[blockSlots];
             int n = 0;
-            for (int q = 0; q < pages; q++)
+            for (int q = 0; q < blocks; q++)
             {
-                for (int i = 0; i < perPage; i++) ln[i] = i;
-                for (int i = perPage - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = ln[i]; ln[i] = ln[j]; ln[j] = tmp; }
-                for (int i = 0; i < perPage; i++) seq[n++] = pg[q] * perPage + ln[i];
+                for (int i = 0; i < blockSlots; i++) pos[i] = i;
+                for (int i = blockSlots - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = pos[i]; pos[i] = pos[j]; pos[j] = tmp; }
+                for (int i = 0; i < blockSlots; i++) seq[n++] = bo[q] * blockSlots + pos[i];
             }
-            for (int i = 0; i < lines; i++) a[seq[i] * 16] = seq[(i + 1) % lines] * 16;   // um unico ciclo
-            long steps = Math.Max(3000000L, lines * 2L);
+            for (int i = 0; i < slots; i++) a[seq[i] * 32] = seq[(i + 1) % slots] * 32;   // um unico ciclo (32 ints = 128 B)
+            seq = null;
+            long steps = Math.Max(4000000L, slots * 2L);
             int p = 0;
-            for (long i = 0; i < lines; i++) p = a[p];   // aquecimento: traz o bloco para o cache/TLB
+            for (long i = 0; i < slots; i++) p = a[p];            // aquecimento: uma volta completa (traz o buffer para o cache/TLB se couber)
             double best = double.MaxValue;
             int reps = bytes <= 8L * 1024 * 1024 ? 3 : 2;
             for (int r = 0; r < reps; r++)
