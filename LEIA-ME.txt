@@ -287,3 +287,6 @@ CORRECOES v1.7.1
 === v1.22.0 ===
 - O programa agora abre na frente de outras janelas (antes podia abrir atras do Explorer).
 - Novo botao com o logotipo do Windows 10 no canto superior direito (abaixo do X, em todas as abas): liga/desliga "Iniciar com o Windows". Ligado, o botao fica azul e afundado; desligado, cinza. Usa uma tarefa agendada no logon com privilegios de administrador (nao pede permissao a cada boot, roda tambem no notebook na bateria) e abre minimizado na bandeja.
+
+=== v1.22.1 ===
+- Latencia da memoria: o teste agora se comporta como o AIDA64. A ordem continua aleatoria, mas cada pagina de 4 KB e percorrida por inteiro antes de saltar para outra, o que tira a falha de TLB (traducao de enderecos) da conta (antes ela somava varios ns e o valor ficava bem acima do AIDA64). O teste tambem fica fixo em um nucleo para nao oscilar.

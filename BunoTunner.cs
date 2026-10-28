@@ -1790,7 +1790,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.22.0";
+        public const string Version = "v1.22.1";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -8764,9 +8764,19 @@ namespace BunoTunner
             Th.Thread me = Th.Thread.CurrentThread;
             Th.ThreadPriority old = me.Priority;
             string err = null;
+            IntPtr oldMask = IntPtr.Zero;
+            bool pinned = false;
             try
             {
                 me.Priority = Th.ThreadPriority.Highest;
+                // fixa em um nucleo (fora do 0, que atende interrupcoes) para o resultado nao oscilar
+                int cpus = Environment.ProcessorCount;
+                if (cpus >= 2 && cpus <= 64)
+                {
+                    Th.Thread.BeginThreadAffinity();
+                    oldMask = SetThreadAffinityMask(GetCurrentThread(), (IntPtr)(1L << (cpus >= 4 ? 2 : 1)));
+                    pinned = true;
+                }
                 long[] kbs = { 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144 };
                 for (int s = 0; s < kbs.Length && !latStop; s++)
                 {
@@ -8776,6 +8786,7 @@ namespace BunoTunner
                 }
             }
             catch (Exception ex) { err = ex.Message; }
+            if (pinned) { try { SetThreadAffinityMask(GetCurrentThread(), oldMask); Th.Thread.EndThreadAffinity(); } catch (Exception) { } }
             me.Priority = old;
             try
             {
@@ -8796,16 +8807,31 @@ namespace BunoTunner
             catch (Exception) { }
         }
 
-        // tempo medio (ns) de um acesso dependente a um bloco de 'bytes' (passo de 64 B em ordem aleatoria)
+        [DllImport("kernel32.dll")] static extern IntPtr SetThreadAffinityMask(IntPtr h, IntPtr mask);
+        [DllImport("kernel32.dll")] static extern IntPtr GetCurrentThread();
+
+        // tempo medio (ns) de um acesso dependente a um bloco de 'bytes'. Como no AIDA64, a ordem e aleatoria entre as paginas de 4 KB
+        // e entre as linhas de 64 B dentro de cada pagina, mas uma pagina e percorrida por inteiro antes de saltar para outra:
+        // assim a falha de TLB (traducao de endereco) quase nao entra na conta e o resultado e a latencia da DRAM em si.
         static double LatMeasure(long bytes)
         {
             int lines = (int)(bytes / 64);
             int[] a = new int[lines * 16];
-            int[] perm = new int[lines];
-            for (int i = 0; i < lines; i++) perm[i] = i;
+            int[] seq = new int[lines];
+            int pages = Math.Max(1, lines / 64), perPage = lines / pages;
+            int[] pg = new int[pages];
+            for (int i = 0; i < pages; i++) pg[i] = i;
             Random rnd = new Random(12345);
-            for (int i = lines - 1; i > 0; i--) { int j = rnd.Next(i); int t = perm[i]; perm[i] = perm[j]; perm[j] = t; }   // Sattolo: um unico ciclo
-            for (int i = 0; i < lines; i++) a[perm[i] * 16] = perm[(i + 1) % lines] * 16;
+            for (int i = pages - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = pg[i]; pg[i] = pg[j]; pg[j] = tmp; }
+            int[] ln = new int[perPage];
+            int n = 0;
+            for (int q = 0; q < pages; q++)
+            {
+                for (int i = 0; i < perPage; i++) ln[i] = i;
+                for (int i = perPage - 1; i > 0; i--) { int j = rnd.Next(i + 1); int tmp = ln[i]; ln[i] = ln[j]; ln[j] = tmp; }
+                for (int i = 0; i < perPage; i++) seq[n++] = pg[q] * perPage + ln[i];
+            }
+            for (int i = 0; i < lines; i++) a[seq[i] * 16] = seq[(i + 1) % lines] * 16;   // um unico ciclo
             long steps = Math.Max(3000000L, lines * 2L);
             int p = 0;
             for (long i = 0; i < lines; i++) p = a[p];   // aquecimento: traz o bloco para o cache/TLB
