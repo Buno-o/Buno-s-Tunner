@@ -283,3 +283,7 @@ CORRECOES v1.7.1
 
 === v1.21.2 ===
 - Icone da Saude do armazenamento: HDD com faixa "SMART" e check verde.
+
+=== v1.22.0 ===
+- O programa agora abre na frente de outras janelas (antes podia abrir atras do Explorer).
+- Novo botao com o logotipo do Windows 10 no canto superior direito (abaixo do X, em todas as abas): liga/desliga "Iniciar com o Windows". Ligado, o botao fica azul e afundado; desligado, cinza. Usa uma tarefa agendada no logon com privilegios de administrador (nao pede permissao a cada boot, roda tambem no notebook na bateria) e abre minimizado na bandeja.

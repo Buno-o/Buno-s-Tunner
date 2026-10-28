@@ -357,6 +357,9 @@ namespace BunoTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "Iniciar com o Windows: LIGADO\nClique para desligar.", "Start with Windows: ON\nClick to turn off.",
+            "Iniciar com o Windows: desligado\nClique para ligar (abre na bandeja ao entrar no Windows).", "Start with Windows: off\nClick to turn on (opens in the tray when you log in to Windows).",
+            "Nao foi possivel alterar a inicializacao com o Windows:\n", "Could not change the start with Windows setting:\n",
             "  Busca falhou (", "  Search failed (",
             "Windows Update", "Windows Update",
             "servidor padrao", "default server",
@@ -1787,7 +1790,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.21.2";
+        public const string Version = "v1.22.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2242,6 +2245,27 @@ namespace BunoTunner
             float w = ic.Width, h = ic.Height, cx = ic.X + w / 2f, cy = ic.Y + h / 2f, rad = Math.Min(w, h) / 2f;
             switch (kind)
             {
+                case "win10":
+                case "win10on":
+                    {
+                        // logotipo do Windows 10: quatro paineis (azul = ligado, cinza = desligado)
+                        bool on = kind == "win10on";
+                        Color c1 = on ? Color.FromArgb(70, 170, 255) : Color.FromArgb(185, 190, 200), c2 = on ? Color.FromArgb(0, 105, 200) : Color.FromArgb(120, 126, 138);
+                        PointF[][] panes = {
+                            new PointF[] { new PointF(0f, 0.14f), new PointF(0.47f, 0.07f), new PointF(0.47f, 0.47f), new PointF(0f, 0.47f) },
+                            new PointF[] { new PointF(0.53f, 0.06f), new PointF(1f, 0f), new PointF(1f, 0.47f), new PointF(0.53f, 0.47f) },
+                            new PointF[] { new PointF(0f, 0.53f), new PointF(0.47f, 0.53f), new PointF(0.47f, 0.93f), new PointF(0f, 0.86f) },
+                            new PointF[] { new PointF(0.53f, 0.53f), new PointF(1f, 0.53f), new PointF(1f, 1f), new PointF(0.53f, 0.94f) } };
+                        RectangleF wb = new RectangleF(ic.X, ic.Y, w, h);
+                        using (LinearGradientBrush wg = new LinearGradientBrush(wb, c1, c2, 90f))
+                            foreach (PointF[] pn in panes)
+                            {
+                                PointF[] q = new PointF[4];
+                                for (int i = 0; i < 4; i++) q[i] = new PointF(ic.X + pn[i].X * w, ic.Y + pn[i].Y * h);
+                                g.FillPolygon(wg, q);
+                            }
+                        break;
+                    }
                 case "fan":
                     {
                         Rectangle fb = new Rectangle(ic.X - 1, ic.Y - 1, ic.Width + 2, ic.Height + 2);
@@ -5075,6 +5099,51 @@ namespace BunoTunner
             try { if (worker != null) worker.Join(2500); } catch (Exception) { }
             Nvml.Shutdown();
             if (pc != null) { try { pc.Close(); } catch (Exception) { } }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    //  Iniciar com o Windows: tarefa agendada no logon com privilegios maximos (o programa exige administrador,
+    //  entao a chave Run nao serve: o Windows bloquearia a abertura sem pedir permissao)
+    // ------------------------------------------------------------------
+    static class AutoStart
+    {
+        const string TaskName = "BunoTunner";
+        public static bool IsOn()
+        {
+            int c; Proc.Run("schtasks.exe", "/query /tn " + TaskName, 20000, out c);
+            return c == 0;
+        }
+        public static bool Set(bool on, out string err)
+        {
+            err = "";
+            int c; string o;
+            if (!on)
+            {
+                o = Proc.Run("schtasks.exe", "/delete /tn " + TaskName + " /f", 20000, out c);
+                if (c != 0) err = o;
+                return c == 0;
+            }
+            string exe = Application.ExecutablePath, user = WindowsIdentity.GetCurrent().Name;
+            Func<string, string> x = delegate(string s) { return System.Security.SecurityElement.Escape(s); };
+            string xml = "<?xml version=\"1.0\" encoding=\"UTF-16\"?>\r\n<Task version=\"1.2\" xmlns=\"http://schemas.microsoft.com/windows/2004/02/mit/task\">\r\n" +
+                "<RegistrationInfo><Description>BunoTunner - inicia com o Windows</Description></RegistrationInfo>\r\n" +
+                "<Triggers><LogonTrigger><Enabled>true</Enabled><UserId>" + x(user) + "</UserId><Delay>PT5S</Delay></LogonTrigger></Triggers>\r\n" +
+                "<Principals><Principal id=\"Author\"><UserId>" + x(user) + "</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal></Principals>\r\n" +
+                "<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>" +
+                "<AllowHardTerminate>true</AllowHardTerminate><StartWhenAvailable>true</StartWhenAvailable><AllowStartOnDemand>true</AllowStartOnDemand><Enabled>true</Enabled><Hidden>false</Hidden>" +
+                "<ExecutionTimeLimit>PT0S</ExecutionTimeLimit><Priority>7</Priority></Settings>\r\n" +
+                "<Actions Context=\"Author\"><Exec><Command>" + x(exe) + "</Command><Arguments>--tray</Arguments><WorkingDirectory>" + x(Path.GetDirectoryName(exe)) + "</WorkingDirectory></Exec></Actions>\r\n</Task>";
+            string tmp = Path.Combine(Path.GetTempPath(), "BunoTunner_task.xml");
+            try
+            {
+                File.WriteAllText(tmp, xml, Encoding.Unicode);
+                o = Proc.Run("schtasks.exe", "/create /tn " + TaskName + " /xml \"" + tmp + "\" /f", 30000, out c);
+                if (c != 0) err = o;
+                return c == 0;
+            }
+            catch (Exception ex) { err = ex.Message; return false; }
+            finally { try { File.Delete(tmp); } catch (Exception) { } }
         }
     }
 
@@ -11134,6 +11203,18 @@ namespace BunoTunner
             cmb.DropDownStyle = ComboBoxStyle.DropDownList; cmb.Font = Xp.Ui;
             cmb.SetBounds(95, 2, 330, 22);
             right.Controls.Add(cmb);
+            // iniciar com o Windows (canto superior direito, mesmo tamanho dos botoes PayPal/LivePix)
+            bWin = new XpIconButton("win10", 24); bWin.Top = 2;
+            right.Controls.Add(bWin); bWin.BringToFront();
+            right.Resize += delegate { bWin.Left = right.ClientSize.Width - 32; };
+            bWin.Left = 676 - 24;
+            SetAutoBtn(false);
+            bWin.Click += delegate { ToggleAutoStart(); };
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool on = AutoStart.IsOn();
+                try { BeginInvoke(new Action(delegate { SetAutoBtn(on); })); } catch (Exception) { }
+            });
             lblTheme = UI.Lbl(bar, "Tema:", 264, 8, Xp.UiBold);
             cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(306, 4, 176, 22); cbTheme.DropDownWidth = 230;
             cbTheme.Items.AddRange(Xp.ThemeNames);
@@ -11174,6 +11255,9 @@ namespace BunoTunner
                 Lang.StartSweeper();
                 Startup.CloseSplash();
                 Startup.Save();
+                bool trayStart = false;
+                foreach (string a in Environment.GetCommandLineArgs()) if (a == "--tray") trayStart = true;
+                if (trayStart && tray != null && Settings.Get("tray", "1") == "1") Hide(); else ForceFront();
                 StartGpuExtras();
                 ramPage.LoadAsync();
                 // WMI e lento: coleta a CPU em segundo plano para nao travar a janela
@@ -11966,6 +12050,55 @@ namespace BunoTunner
                 lblClocks.Text = "Nucleo: " + (clk.HasValue ? clk.Value.ToString("0") : "-") + " MHz     SM: " + (sm.HasValue ? sm.Value.ToString("0") : "-") +
                     " MHz     Memoria: " + (mem.HasValue ? mem.Value.ToString("0") : "-") + " MHz     Video: " + (vid.HasValue ? vid.Value.ToString("0") : "-") + " MHz";
             }
+        }
+
+        // ---------------- iniciar com o Windows ----------------
+        XpIconButton bWin;
+        void SetAutoBtn(bool on)
+        {
+            bWin.Kind = on ? "win10on" : "win10"; bWin.Selected = on; bWin.Invalidate();
+            tip.SetToolTip(bWin, on ? "Iniciar com o Windows: LIGADO\nClique para desligar." : "Iniciar com o Windows: desligado\nClique para ligar (abre na bandeja ao entrar no Windows).");
+        }
+        void ToggleAutoStart()
+        {
+            bool want = bWin.Kind != "win10on";
+            bWin.Enabled = false;
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string err;
+                bool ok = AutoStart.Set(want, out err);
+                bool now = AutoStart.IsOn();
+                try
+                {
+                    BeginInvoke(new Action(delegate
+                    {
+                        bWin.Enabled = true; SetAutoBtn(now);
+                        if (!ok) Dlg.Show(this, "Nao foi possivel alterar a inicializacao com o Windows:\n" + err, "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }));
+                }
+                catch (Exception) { }
+            });
+        }
+
+        // ---------------- abrir na frente ----------------
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
+        [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
+        [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
+        [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+        // o Windows nao deixa um programa elevado (administrador) passar na frente de um nao elevado (ex.: Explorer); isto contorna
+        void ForceFront()
+        {
+            try
+            {
+                uint pid; uint ft = GetWindowThreadProcessId(GetForegroundWindow(), out pid), me = GetCurrentThreadId();
+                if (ft != me) AttachThreadInput(me, ft, true);
+                if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+                TopMost = true; TopMost = false;
+                BringToFront(); Activate(); SetForegroundWindow(Handle);
+                if (ft != me) AttachThreadInput(me, ft, false);
+            }
+            catch (Exception) { }
         }
 
         // ---------------- bandeja do sistema ----------------
