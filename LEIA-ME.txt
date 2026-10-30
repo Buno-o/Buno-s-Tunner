@@ -303,3 +303,7 @@ CORRECOES v1.7.1
 v1.23.0
 - Botao de atualizacao (seta para baixo), a esquerda do botao "iniciar com o Windows": so verifica ao ser clicado. Se houver versao mais nova no GitHub, pergunta Sim/Nao; em Sim baixa, confere o SHA-256 publicado e substitui o programa (oferece reiniciar).
 - Botao "iniciar com o Windows" agora acende corretamente apos reiniciar o PC (o estado e consultado depois que a janela abre, com nova tentativa).
+
+v1.23.1
+- Saude do armazenamento: agora le os atributos S.M.A.R.T. reais (setores realocados/pendentes/incorrigiveis, falha prevista pelo disco, valores abaixo do limite) e mostra a tabela completa de atributos. Antes dependia so do "Healthy" do Windows, que quase nunca acusa um HD ruim.
+- Antivirus: o exe agora tem informacoes de versao (empresa/produto/copyright), o reinicio apos atualizar nao usa mais "cmd /c" e o PowerShell nao usa mais "-ExecutionPolicy Bypass". Deteccoes como "Trojan.Win64.MSIL_Heur.A" / "grayware" sao heuristicas (falso positivo) por o programa ser administrador, usar driver de hardware e embutir DLLs.

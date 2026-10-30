@@ -25,6 +25,14 @@ using System.Windows.Forms;
 using LHM = LibreHardwareMonitor.Hardware;
 using Th = System.Threading;
 
+[assembly: AssemblyTitle("BunoTunner")]
+[assembly: AssemblyDescription("BunoTunner - controle de ventoinhas, overclock e sensores (open source)")]
+[assembly: AssemblyCompany("Buno")]
+[assembly: AssemblyProduct("BunoTunner")]
+[assembly: AssemblyCopyright("Copyright (c) Buno - codigo aberto: github.com/Buno-o/BunoTunner")]
+[assembly: AssemblyVersion("1.23.1.0")]
+[assembly: AssemblyFileVersion("1.23.1.0")]
+
 namespace BunoTunner
 {
     // ------------------------------------------------------------------
@@ -1462,6 +1470,13 @@ namespace BunoTunner
         [STAThread]
         static void Main()
         {
+            // reinicio apos atualizar: espera o processo antigo terminar
+            try
+            {
+                string[] ca = Environment.GetCommandLineArgs();
+                for (int i = 1; i + 1 < ca.Length; i++) if (ca[i] == "--restart") { int pid; if (int.TryParse(ca[i + 1], out pid)) try { Process.GetProcessById(pid).WaitForExit(8000); } catch (Exception) { } }
+            }
+            catch (Exception) { }
             AppDomain.CurrentDomain.AssemblyResolve += Resolve;
             Start();
         }
@@ -1806,7 +1821,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.23.0";
+        public const string Version = "v1.23.1";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -10534,6 +10549,35 @@ namespace BunoTunner
         public long Size;
         public double Temp = double.NaN, TempMax = double.NaN, Wear = double.NaN, Hours = double.NaN, ReadErr = double.NaN, WriteErr = double.NaN, Cycles = double.NaN;
         public bool IsSsd { get { return Media == "SSD" || Bus == "NVMe"; } }
+        public class Attr { public int Id; public int Val, Worst, Thr; public long Raw; }
+        public List<Attr> Smart = new List<Attr>();
+        public bool Predict;                 // o proprio disco previu falha (FailurePredictStatus)
+        public string Reason = "";           // motivo do estado Ruim/Atencao, vindo dos atributos S.M.A.R.T.
+        static readonly Dictionary<int, string> AttrNames = new Dictionary<int, string> {
+            {1,"Taxa de erros de leitura"},{2,"Desempenho (throughput)"},{3,"Tempo de spin-up"},{4,"Partidas/paradas"},{5,"Setores realocados"},{7,"Taxa de erros de busca"},{9,"Horas ligado"},
+            {10,"Tentativas de spin-up"},{11,"Tentativas de recalibracao"},{12,"Ciclos liga/desliga"},{183,"Blocos ruins em execucao"},{184,"Erros fim-a-fim"},{187,"Erros incorrigiveis reportados"},
+            {188,"Timeouts de comando"},{189,"Gravacoes com cabeca alta"},{190,"Temperatura do fluxo de ar"},{191,"Choques (G-sense)"},{192,"Retracoes por desligamento"},{193,"Ciclos de carga/descarga"},
+            {194,"Temperatura"},{195,"Erros de ECC corrigidos"},{196,"Eventos de realocacao"},{197,"Setores pendentes"},{198,"Setores incorrigiveis offline"},{199,"Erros de CRC (cabo)"},{200,"Erros multi-zona"},
+            {240,"Horas de cabeca"},{241,"Total gravado (LBAs)"},{242,"Total lido (LBAs)"} };
+        public static string AttrName(int id) { string s; return AttrNames.TryGetValue(id, out s) ? s : "Atributo"; }
+        public void Judge(out bool bad, out bool warn)
+        {
+            bad = Predict; warn = false; List<string> why = new List<string>();
+            if (Predict) why.Add("o disco previu falha (S.M.A.R.T.)");
+            foreach (Attr a in Smart)
+            {
+                long r = Raw32(a);
+                if (a.Thr > 0 && a.Val > 0 && a.Val <= a.Thr && a.Id != 190 && a.Id != 194) { bad = true; why.Add(AttrName(a.Id) + " abaixo do limite"); }
+                switch (a.Id)
+                {
+                    case 5: case 196: if (r >= 100) { bad = true; why.Add(r + " " + AttrName(a.Id).ToLower()); } else if (r > 0) { warn = true; why.Add(r + " " + AttrName(a.Id).ToLower()); } break;
+                    case 197: case 198: case 187: if (r >= 10) { bad = true; why.Add(r + " " + AttrName(a.Id).ToLower()); } else if (r > 0) { warn = true; why.Add(r + " " + AttrName(a.Id).ToLower()); } break;
+                    case 10: case 184: case 183: case 199: if (r > 0) { warn = true; why.Add(r + " - " + AttrName(a.Id).ToLower()); } break;
+                }
+            }
+            Reason = string.Join("; ", why.ToArray());
+        }
+        static long Raw32(Attr a) { return a.Raw & 0xFFFFFFFFL; }
         public double Life { get { return double.IsNaN(Wear) ? double.NaN : Math.Max(0, 100 - Wear); } }
         public string Kind { get { return (Bus.Length > 0 ? Bus + " " : "") + (Media == "SSD" ? "SSD" : Media == "HDD" ? "HDD" : Media); } }
     }
@@ -10611,6 +10655,34 @@ namespace BunoTunner
                         l.Add(d);
                     }
                     if (l.Count == 0) err = o.Length > 0 && !o.StartsWith("DISK") ? o : "o Windows nao informou discos";
+                    // atributos S.M.A.R.T. reais (WMI root\wmi): o 'Healthy' do Windows quase nunca acusa um HDD ruim
+                    try
+                    {
+                        string ps = "$d=@{};$t=@{};$f=@{};"
+                          + "Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_ATAPISmartData -ErrorAction SilentlyContinue | ForEach-Object { $d[$_.InstanceName.ToUpper()]=$_.VendorSpecific };"
+                          + "Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictThresholds -ErrorAction SilentlyContinue | ForEach-Object { $t[$_.InstanceName.ToUpper()]=$_.VendorSpecific };"
+                          + "Get-CimInstance -Namespace root\\wmi -ClassName MSStorageDriver_FailurePredictStatus -ErrorAction SilentlyContinue | ForEach-Object { $f[$_.InstanceName.ToUpper()]=$_.PredictFailure };"
+                          + "Get-CimInstance Win32_DiskDrive | ForEach-Object { $p=$_.PNPDeviceID.ToUpper(); $k=$d.Keys | Where-Object { $_.StartsWith($p) } | Select-Object -First 1; $out=@(); $v=$null; if($k){$v=$d[$k]}; "
+                          + "if($v){ for($i=2;$i+11 -lt $v.Length;$i+=12){ $id=$v[$i]; if($id -eq 0){continue}; $raw=[int64]0; for($j=5;$j -ge 0;$j--){ $raw=$raw*256+$v[$i+5+$j] }; $th=0; if($t[$k]){$th=$t[$k][$i+1]}; $out+=('{0}:{1}:{2}:{3}:{4}' -f $id,$v[$i+3],$v[$i+4],$th,$raw) } }; "
+                          + "('SMART',$_.Index,$f[$k],($out -join ';')) -join '|' }";
+                        string so = Proc.Run("powershell.exe", "-NoProfile -NonInteractive -Command \"" + ps + "\"", 45000, out c);
+                        foreach (string line in so.Replace("\r", "").Split('\n'))
+                        {
+                            if (!line.StartsWith("SMART|")) continue;
+                            string[] p = line.Split('|'); if (p.Length < 4) continue;
+                            DiskInfo d = null; foreach (DiskInfo x in l) if (x.Id == p[1]) d = x;
+                            if (d == null) continue;
+                            d.Predict = p[2].Equals("True", StringComparison.OrdinalIgnoreCase);
+                            foreach (string e in p[3].Split(new char[] { ';' }, StringSplitOptions.RemoveEmptyEntries))
+                            {
+                                string[] q = e.Split(':'); if (q.Length < 5) continue;
+                                DiskInfo.Attr a = new DiskInfo.Attr(); int iv; long lv;
+                                int.TryParse(q[0], out iv); a.Id = iv; int.TryParse(q[1], out iv); a.Val = iv; int.TryParse(q[2], out iv); a.Worst = iv; int.TryParse(q[3], out iv); a.Thr = iv; long.TryParse(q[4], out lv); a.Raw = lv;
+                                d.Smart.Add(a);
+                            }
+                        }
+                    }
+                    catch (Exception) { }
                 }
                 catch (Exception ex) { err = ex.Message; }
                 try
@@ -10627,10 +10699,10 @@ namespace BunoTunner
 
         static string HealthText(DiskInfo d)
         {
-            double life = d.Life;
-            if (d.Health.Equals("Unhealthy", StringComparison.OrdinalIgnoreCase) || (!double.IsNaN(life) && life < 10)) return "Ruim";
-            if (d.Health.Equals("Warning", StringComparison.OrdinalIgnoreCase) || (!double.IsNaN(life) && life < 30) || (!double.IsNaN(d.Temp) && d.Temp >= 70) || (!double.IsNaN(d.ReadErr) && d.ReadErr > 0) || (!double.IsNaN(d.WriteErr) && d.WriteErr > 0)) return "Atencao";
-            if (d.Health.Length == 0 || d.Health.Equals("Unknown", StringComparison.OrdinalIgnoreCase)) return "Sem dados";
+            double life = d.Life; bool sb, sw; d.Judge(out sb, out sw);
+            if (sb || d.Health.Equals("Unhealthy", StringComparison.OrdinalIgnoreCase) || (!double.IsNaN(life) && life < 10)) return "Ruim";
+            if (sw || d.Health.Equals("Warning", StringComparison.OrdinalIgnoreCase) || (!double.IsNaN(life) && life < 30) || (!double.IsNaN(d.Temp) && d.Temp >= 70) || (!double.IsNaN(d.ReadErr) && d.ReadErr > 0) || (!double.IsNaN(d.WriteErr) && d.WriteErr > 0)) return "Atencao";
+            if ((d.Health.Length == 0 || d.Health.Equals("Unknown", StringComparison.OrdinalIgnoreCase)) && d.Smart.Count == 0) return "Sem dados";
             return "Boa";
         }
         Color HealthColor(string h) { return h == "Boa" ? Xp.Good : h == "Sem dados" ? Xp.Dim : Xp.Bad; }
@@ -10677,11 +10749,17 @@ namespace BunoTunner
             rows.Add(new string[] { "Modelo", d.Name }); rows.Add(new string[] { "Tipo / interface", d.Kind });
             rows.Add(new string[] { "Capacidade", (d.Size / 1000000000L) + " GB (" + (d.Size / 1073741824L) + " GiB)" });
             rows.Add(new string[] { "Firmware", d.Fw }); rows.Add(new string[] { "Estado informado pelo Windows", d.Health });
+            if (d.Smart.Count == 0) rows.Add(new string[] { "S.M.A.R.T. detalhado", "nao disponivel (disco USB/RAID ou NVMe sem tabela ATA)" });
             if (!double.IsNaN(d.Wear)) rows.Add(new string[] { "Desgaste (uso da vida util)", d.Wear.ToString("0") + "%" });
             if (!double.IsNaN(d.Hours)) rows.Add(new string[] { "Horas ligado", d.Hours.ToString("0") + " h (~" + (d.Hours / 24).ToString("0") + " dias)" });
             if (!double.IsNaN(d.Cycles)) rows.Add(new string[] { "Ciclos liga/desliga", d.Cycles.ToString("0") });
             if (!double.IsNaN(d.TempMax)) rows.Add(new string[] { "Temperatura maxima registrada", d.TempMax.ToString("0") + " C" });
             rows.Add(new string[] { "Erros de leitura (total)", Fmt(d.ReadErr, "") }); rows.Add(new string[] { "Erros de escrita (total)", Fmt(d.WriteErr, "") });
+            foreach (DiskInfo.Attr a in d.Smart)
+            {
+                if (a.Id == 194 || a.Id == 190 || a.Id == 9) continue;
+                rows.Add(new string[] { "S.M.A.R.T. " + a.Id + " - " + DiskInfo.AttrName(a.Id), "bruto " + (a.Raw & 0xFFFFFFFFL) + "  (atual " + a.Val + " / pior " + a.Worst + (a.Thr > 0 ? " / limite " + a.Thr : "") + ")" });
+            }
             foreach (Sn s in Sensors(d))
             {
                 float? v = s.Last; if (!v.HasValue) continue;
@@ -10690,8 +10768,8 @@ namespace BunoTunner
             }
             foreach (string[] r in rows) lvA.Items.Add(new ListViewItem(r));
             string adv;
-            if (h == "Ruim") adv = "ATENCAO: o disco indica falha iminente ou pouca vida util. Faca backup AGORA e planeje a troca.";
-            else if (h == "Atencao") adv = "Ha sinais de desgaste, erros ou temperatura alta. Mantenha backup em dia e acompanhe.";
+            if (h == "Ruim") adv = "ATENCAO: o disco indica falha iminente ou pouca vida util" + (d.Reason.Length > 0 ? " (" + d.Reason + ")" : "") + ". Faca backup AGORA e planeje a troca.";
+            else if (h == "Atencao") adv = "Ha sinais de desgaste, erros ou temperatura alta" + (d.Reason.Length > 0 ? " (" + d.Reason + ")" : "") + ". Mantenha backup em dia e acompanhe.";
             else if (h == "Boa") adv = d.IsSsd ? "Tudo certo. SSDs perdem vida conforme a quantidade de dados gravados; valores abaixo de 30% pedem atencao." : "Tudo certo. Em HDDs, observe erros e temperatura (ideal abaixo de 50 C).";
             else adv = "O Windows nao informou S.M.A.R.T. deste disco (comum em discos USB e controladoras RAID).";
             lblAdvice.Text = adv; lblAdvice.ForeColor = h == "Ruim" || h == "Atencao" ? Xp.Bad : Xp.Dim;
@@ -10758,7 +10836,7 @@ namespace BunoTunner
         {
             string enc = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
             int c;
-            return Proc.Run("powershell.exe", "-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + enc, ms, out c);
+            return Proc.Run("powershell.exe", "-NoProfile -NonInteractive -EncodedCommand " + enc, ms, out c);
         }
 
         // inventario: todos os dispositivos com driver e os que estao com problema
@@ -12233,9 +12311,7 @@ namespace BunoTunner
             if (Dlg.Show(this, "Atualizado para " + tag + (hashOk ? " (SHA-256 conferido)." : ".") + "\n\nReiniciar o BunoTunner agora?", "BunoTunner", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
             try
             {
-                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c timeout /t 2 /nobreak >nul & start \"\" \"" + cur + "\"");
-                psi.CreateNoWindow = true; psi.UseShellExecute = false;
-                Process.Start(psi);
+                Process.Start(new ProcessStartInfo(cur, "--restart " + Process.GetCurrentProcess().Id));
             }
             catch (Exception) { }
             Close();
