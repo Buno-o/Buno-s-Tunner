@@ -357,6 +357,22 @@ namespace BunoTunner
             "Travar clock da memoria (MHz):  min", "Lock memory clock (MHz):  min",
             "Atualizar a cada:", "Update every:" };
         static readonly string[] Pairs2 = {
+            "Procurando atualizacoes...", "Looking for updates...",
+            "Baixando atualizacao...", "Downloading update...",
+            "Verificar atualizacoes\nProcura uma versao mais nova do BunoTunner e, se voce quiser, baixa e instala.", "Check for updates\nLooks for a newer BunoTunner version and, if you want, downloads and installs it.",
+            "Nao foi possivel verificar atualizacoes:\n", "Could not check for updates:\n",
+            "A versao mais recente nao foi encontrada.", "The latest version was not found.",
+            "Voce ja esta na versao mais recente (", "You already have the latest version (",
+            "Nova versao disponivel: ", "New version available: ",
+            " (atual: ", " (current: ",
+            "Deseja baixar e atualizar agora?", "Do you want to download and update now?",
+            "Falha ao baixar a atualizacao:\n", "Failed to download the update:\n",
+            "O arquivo baixado e invalido.", "The downloaded file is invalid.",
+            "O SHA-256 do arquivo baixado nao confere com o publicado no GitHub; o arquivo foi descartado.", "The downloaded file's SHA-256 does not match the one published on GitHub; the file was discarded.",
+            "A nova versao foi baixada, mas nao foi possivel substituir o arquivo atual.\nEla foi salva em:\n", "The new version was downloaded, but the current file could not be replaced.\nIt was saved at:\n",
+            "Atualizado para ", "Updated to ",
+            " (SHA-256 conferido).", " (SHA-256 verified).",
+            "Reiniciar o BunoTunner agora?", "Restart BunoTunner now?",
             "Iniciar com o Windows: LIGADO\nClique para desligar.", "Start with Windows: ON\nClick to turn off.",
             "Iniciar com o Windows: desligado\nClique para ligar (abre na bandeja ao entrar no Windows).", "Start with Windows: off\nClick to turn on (opens in the tray when you log in to Windows).",
             "Nao foi possivel alterar a inicializacao com o Windows:\n", "Could not change the start with Windows setting:\n",
@@ -1790,7 +1806,7 @@ namespace BunoTunner
         }
 
         // Logo: esfera dourada 3D em pixel art (grade 20x20, ampliada sem suavizar)
-        public const string Version = "v1.22.4";
+        public const string Version = "v1.23.0";
         public const int LogoGrid = 20;
         public static Bitmap Logo(int scale)
         {
@@ -2245,6 +2261,15 @@ namespace BunoTunner
             float w = ic.Width, h = ic.Height, cx = ic.X + w / 2f, cy = ic.Y + h / 2f, rad = Math.Min(w, h) / 2f;
             switch (kind)
             {
+                case "update":
+                    {
+                        // seta para baixo sobre uma bandeja: baixar/atualizar
+                        using (Pen sh = new Pen(Color.FromArgb(0, 100, 200), Math.Max(2.4f, w * 0.18f))) { sh.StartCap = LineCap.Round; sh.EndCap = LineCap.Round; g.DrawLine(sh, cx, ic.Y + h * 0.06f, cx, ic.Y + h * 0.56f); }
+                        using (SolidBrush hd = new SolidBrush(Color.FromArgb(30, 140, 235)))
+                            g.FillPolygon(hd, new PointF[] { new PointF(ic.X + w * 0.12f, ic.Y + h * 0.46f), new PointF(ic.Right - w * 0.12f, ic.Y + h * 0.46f), new PointF(cx, ic.Y + h * 0.82f) });
+                        using (Pen tr = new Pen(Color.FromArgb(0, 100, 200), Math.Max(2f, w * 0.14f))) { tr.StartCap = LineCap.Round; tr.EndCap = LineCap.Round; g.DrawLine(tr, ic.X + w * 0.04f, ic.Bottom - h * 0.04f, ic.Right - w * 0.04f, ic.Bottom - h * 0.04f); }
+                        break;
+                    }
                 case "win10":
                 case "win10on":
                     {
@@ -5111,8 +5136,13 @@ namespace BunoTunner
         const string TaskName = "BunoTunner";
         public static bool IsOn()
         {
-            int c; Proc.Run("schtasks.exe", "/query /tn " + TaskName, 20000, out c);
-            return c == 0;
+            for (int i = 0; i < 3; i++)
+            {
+                int c; string o = Proc.Run("schtasks.exe", "/query /tn " + TaskName, 20000, out c);
+                if (c == 0) return true;
+                if (i < 2) System.Threading.Thread.Sleep(1200);   // logo apos o boot o Agendador pode demorar a responder
+            }
+            return false;
         }
         public static bool Set(bool on, out string err)
         {
@@ -11241,11 +11271,13 @@ namespace BunoTunner
             bWin.Left = 676 - 24;
             SetAutoBtn(false);
             bWin.Click += delegate { ToggleAutoStart(); };
-            System.Threading.ThreadPool.QueueUserWorkItem(delegate
-            {
-                bool on = AutoStart.IsOn();
-                try { BeginInvoke(new Action(delegate { SetAutoBtn(on); })); } catch (Exception) { }
-            });
+            // botao de atualizacao (a esquerda do "iniciar com o Windows")
+            bUpd = new XpIconButton("update", 24); bUpd.Top = 2;
+            right.Controls.Add(bUpd); bUpd.BringToFront();
+            right.Resize += delegate { bUpd.Left = right.ClientSize.Width - 62; };
+            bUpd.Left = 676 - 54;
+            tip.SetToolTip(bUpd, "Verificar atualizacoes\nProcura uma versao mais nova do BunoTunner e, se voce quiser, baixa e instala.");
+            bUpd.Click += delegate { CheckUpdate(); };
             lblTheme = UI.Lbl(bar, "Tema:", 264, 8, Xp.UiBold);
             cbTheme = new ComboBox(); cbTheme.DropDownStyle = ComboBoxStyle.DropDownList; cbTheme.Font = Xp.Ui; cbTheme.SetBounds(306, 4, 176, 22); cbTheme.DropDownWidth = 230;
             cbTheme.Items.AddRange(Xp.ThemeNames);
@@ -11286,6 +11318,8 @@ namespace BunoTunner
                 Lang.StartSweeper();
                 Startup.CloseSplash();
                 Startup.Save();
+                RefreshAutoBtn();
+                try { File.Delete(Application.ExecutablePath + ".old"); } catch (Exception) { }
                 bool trayStart = false;
                 foreach (string a in Environment.GetCommandLineArgs()) if (a == "--tray") trayStart = true;
                 if (trayStart && tray != null && Settings.Get("tray", "1") == "1") Hide(); else ForceFront();
@@ -12084,7 +12118,128 @@ namespace BunoTunner
         }
 
         // ---------------- iniciar com o Windows ----------------
-        XpIconButton bWin;
+        XpIconButton bWin, bUpd;
+        void RefreshAutoBtn()
+        {
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                bool on = AutoStart.IsOn();
+                try { BeginInvoke(new Action(delegate { SetAutoBtn(on); })); } catch (Exception) { }
+            });
+        }
+
+        // ---------------- atualizacao (GitHub Releases) ----------------
+        const string UpdApi = "https://api.github.com/repos/Buno-o/BunoTunner/releases/latest";
+        bool updBusy;
+        void SetStatus(string s) { try { BeginInvoke(new Action(delegate { status.Text = s; })); } catch (Exception) { } }
+        void CheckUpdate()
+        {
+            if (updBusy) return;
+            updBusy = true; bUpd.Enabled = false;
+            string oldStatus = status.Text;
+            status.Text = Lang.T("Procurando atualizacoes...");
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string tag = null, url = null, sha = null, err = null;
+                try
+                {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                    HttpWebRequest rq = (HttpWebRequest)WebRequest.Create(UpdApi);
+                    rq.UserAgent = "BunoTunner"; rq.Timeout = 15000; rq.Accept = "application/vnd.github+json";
+                    using (WebResponse rs = rq.GetResponse())
+                    using (StreamReader sr = new StreamReader(rs.GetResponseStream(), Encoding.UTF8))
+                    {
+                        string js = sr.ReadToEnd();
+                        Match m = Regex.Match(js, "\"tag_name\"\\s*:\\s*\"([^\"]+)\"");
+                        if (m.Success) tag = m.Groups[1].Value;
+                        m = Regex.Match(js, "\"browser_download_url\"\\s*:\\s*\"([^\"]*BunoTunner\\.exe)\"");
+                        if (m.Success) url = m.Groups[1].Value;
+                        m = Regex.Match(js, "\"name\"\\s*:\\s*\"BunoTunner\\.exe\".*?\"digest\"\\s*:\\s*\"sha256:([0-9a-fA-F]{64})\"", RegexOptions.Singleline);
+                        if (m.Success) sha = m.Groups[1].Value;
+                    }
+                    if (tag == null || url == null) err = "A versao mais recente nao foi encontrada.";
+                }
+                catch (Exception ex) { err = ex.Message; }
+                try { BeginInvoke(new Action(delegate { UpdateAnswer(tag, url, sha, err, oldStatus); })); } catch (Exception) { }
+            });
+        }
+        static Version VerOf(string s)
+        {
+            Version v; return Version.TryParse((s ?? "").Trim().TrimStart('v', 'V'), out v) ? v : new Version(0, 0);
+        }
+        void UpdateAnswer(string tag, string url, string sha, string err, string oldStatus)
+        {
+            status.Text = oldStatus; updBusy = false; bUpd.Enabled = true;
+            if (err != null) { Dlg.Show(this, "Nao foi possivel verificar atualizacoes:\n" + err, "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            if (VerOf(tag) <= VerOf(Xp.Version)) { Dlg.Show(this, "Voce ja esta na versao mais recente (" + Xp.Version + ").", "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Information); return; }
+            if (Dlg.Show(this, "Nova versao disponivel: " + tag + " (atual: " + Xp.Version + ").\n\nDeseja baixar e atualizar agora?", "BunoTunner", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            updBusy = true; bUpd.Enabled = false;
+            string cur = Application.ExecutablePath, tmp = cur + ".new";
+            System.Threading.ThreadPool.QueueUserWorkItem(delegate
+            {
+                string e2 = null;
+                try
+                {
+                    ServicePointManager.SecurityProtocol = (SecurityProtocolType)3072;
+                    HttpWebRequest rq = (HttpWebRequest)WebRequest.Create(url);
+                    rq.UserAgent = "BunoTunner"; rq.Timeout = 30000;
+                    using (WebResponse rs = rq.GetResponse())
+                    using (Stream ins = rs.GetResponseStream())
+                    using (FileStream fs = new FileStream(tmp, FileMode.Create, FileAccess.Write))
+                    {
+                        long total = rs.ContentLength, got = 0; byte[] buf = new byte[81920]; int n; int lastPct = -1;
+                        while ((n = ins.Read(buf, 0, buf.Length)) > 0)
+                        {
+                            fs.Write(buf, 0, n); got += n;
+                            int pct = total > 0 ? (int)(got * 100 / total) : 0;
+                            if (pct != lastPct) { lastPct = pct; SetStatus(Lang.T("Baixando atualizacao...") + " " + pct + "%"); }
+                        }
+                    }
+                    FileInfo fi = new FileInfo(tmp);
+                    byte[] head = new byte[2];
+                    using (FileStream hs = File.OpenRead(tmp)) hs.Read(head, 0, 2);
+                    if (fi.Length < 500000 || head[0] != 'M' || head[1] != 'Z') throw new Exception("O arquivo baixado e invalido.");
+                    if (sha != null)
+                    {
+                        string h;
+                        using (System.Security.Cryptography.SHA256 sh = System.Security.Cryptography.SHA256.Create())
+                        using (FileStream hs = File.OpenRead(tmp)) h = BitConverter.ToString(sh.ComputeHash(hs)).Replace("-", "").ToLower();
+                        if (h != sha.ToLower()) throw new Exception("O SHA-256 do arquivo baixado nao confere com o publicado no GitHub; o arquivo foi descartado.");
+                    }
+                }
+                catch (Exception ex) { e2 = ex.Message; try { File.Delete(tmp); } catch (Exception) { } }
+                try { BeginInvoke(new Action(delegate { UpdateDone(e2, tag, cur, tmp, sha != null, oldStatus); })); } catch (Exception) { }
+            });
+        }
+        void UpdateDone(string err, string tag, string cur, string tmp, bool hashOk, string oldStatus)
+        {
+            status.Text = oldStatus; updBusy = false; bUpd.Enabled = true;
+            if (err != null) { Dlg.Show(this, "Falha ao baixar a atualizacao:\n" + err, "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Warning); return; }
+            string old = cur + ".old";
+            try
+            {
+                if (File.Exists(old)) File.Delete(old);
+                File.Move(cur, old);          // um .exe em uso pode ser renomeado
+                File.Move(tmp, cur);
+            }
+            catch (Exception)
+            {
+                try { if (!File.Exists(cur) && File.Exists(old)) File.Move(old, cur); } catch (Exception) { }
+                string alt = Path.Combine(Path.GetDirectoryName(cur), "BunoTunner_" + tag + ".exe");
+                try { if (File.Exists(alt)) File.Delete(alt); File.Move(tmp, alt); } catch (Exception) { alt = tmp; }
+                Dlg.Show(this, "A nova versao foi baixada, mas nao foi possivel substituir o arquivo atual.\nEla foi salva em:\n" + alt, "BunoTunner", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+            if (Dlg.Show(this, "Atualizado para " + tag + (hashOk ? " (SHA-256 conferido)." : ".") + "\n\nReiniciar o BunoTunner agora?", "BunoTunner", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes) return;
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo("cmd.exe", "/c timeout /t 2 /nobreak >nul & start \"\" \"" + cur + "\"");
+                psi.CreateNoWindow = true; psi.UseShellExecute = false;
+                Process.Start(psi);
+            }
+            catch (Exception) { }
+            Close();
+        }
         void SetAutoBtn(bool on)
         {
             bWin.Kind = on ? "win10on" : "win10"; bWin.Selected = on; bWin.Invalidate();
@@ -12168,6 +12323,7 @@ namespace BunoTunner
         }
         void ShowFromTray()
         {
+            RefreshAutoBtn();
             Show();
             if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
             Activate();
